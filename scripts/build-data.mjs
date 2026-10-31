@@ -7,6 +7,7 @@ import { createReadStream } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import readline from 'node:readline';
 import { classify, KEEP_TAG } from '../src/categories.js';
+import { loadExternal, SOURCES } from './external.mjs';
 
 const root = new URL('../', import.meta.url);
 const config = JSON.parse(await readFile(new URL('config.json', root), 'utf8'));
@@ -63,6 +64,50 @@ for (const it of items) if (it.c === 'geldautomat' && it.t.amenity === 'atm') {
 }
 const kept = items.filter((it) => !(it.c === 'geldautomat' && it.t.amenity === 'bank' && atmCells.has(cell(it.lat, it.lon))));
 
+// ---------- Zusätzliche Quellen einmischen ----------
+const usedSources = { osm: kept.length };
+if (!process.env.NO_EXTERNAL) {
+  const ext = await loadExternal(config.regions.map((r) => r.name));
+  const G = 0.005;
+  const gk = (la, lo) => `${Math.floor(la / G)}_${Math.floor(lo / G)}`;
+  const grid = new Map();
+  const addGrid = (it) => { const k = gk(it.lat, it.lon); if (!grid.has(k)) grid.set(k, []); grid.get(k).push(it); };
+  const near = (it, cat, maxM) => {
+    const y = Math.floor(it.lat / G), x = Math.floor(it.lon / G);
+    let best = null, bd = maxM;
+    for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const o of grid.get(`${y + i}_${x + j}`) || []) {
+      if (o.c !== cat) continue;
+      const d = Math.hypot((o.lat - it.lat) * 111320, (o.lon - it.lon) * 111320 * Math.cos(it.lat * Math.PI / 180));
+      if (d < bd) { bd = d; best = o; }
+    }
+    return best;
+  };
+  if ((ext.bnetza?.length || 0) > 1000) {
+    for (let i = kept.length - 1; i >= 0; i--) if (kept[i].c === 'ladesaeule') kept.splice(i, 1);
+    kept.push(...ext.bnetza);
+    usedSources.bnetza = ext.bnetza.length;
+  }
+  kept.forEach(addGrid);
+  for (const it of ext.autobahn || []) {
+    const o = near(it, 'rastplatz', 400);
+    if (o) {
+      if (it.t.toilets && (!o.t.toilets || it.t.toilets === 'yes')) o.t.toilets = it.t.toilets;
+      for (const k of ['autobahn:features', 'autobahn:info', 'ref']) if (it.t[k] && !o.t[k]) o.t[k] = it.t[k];
+      if (!o.t.name && it.t.name) o.t.name = it.t.name;
+      o.src2 = 'autobahn';
+    } else { kept.push(it); addGrid(it); }
+  }
+  if (ext.autobahn) usedSources.autobahn = ext.autobahn.length;
+  for (const name of ['dortmund', 'muenster', 'koeln']) {
+    let added = 0;
+    for (const it of ext[name] || []) {
+      if (near(it, it.c, it.c === 'toilette' ? 60 : 40)) continue;
+      kept.push(it); addGrid(it); added++;
+    }
+    if (ext[name]) usedSources[name] = added;
+  }
+}
+
 const key = (la, lo) => `${Math.floor(la / TILE)}_${Math.floor(lo / TILE)}`;
 const tiles = new Map();
 const tileOf = (k) => { if (!tiles.has(k)) tiles.set(k, { items: [], places: [] }); return tiles.get(k); };
@@ -90,6 +135,7 @@ const index = {
   start: config.start,
   counts,
   tiles: tileCounts,
+  sources: Object.fromEntries(Object.entries(usedSources).map(([k, n]) => [k, { ...SOURCES[k], count: n }])),
 };
 await writeFile(new URL('index.json', dataDir), JSON.stringify(index));
 console.log(`OK: ${kept.length} Orte, ${places.length} Ortsnamen, ${tiles.size} Kacheln, ${(bytes / 1e6).toFixed(1)} MB`);

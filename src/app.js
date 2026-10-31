@@ -164,6 +164,9 @@ function factsOf(it) {
     add('Art', t.highway === 'services' ? 'Raststätte' : 'Rastplatz / Parkplatz');
     add('Toiletten', t.toilets ? jaNein(t.toilets) : 'unbekannt');
     add('Barrierefreies WC', jaNein(t['toilets:wheelchair']));
+    add('Ausstattung', t['autobahn:features']);
+    add('Stellplätze', t['autobahn:info']);
+    add('Fahrtrichtung', t.ref);
   }
   if (it.c === 'packstation') {
     add('Anbieter', t.brand || t.operator);
@@ -185,6 +188,7 @@ function factsOf(it) {
     add('Ladepunkte', t.capacity);
     add('Öffnungszeiten', weekSummary(parseHours(t.opening_hours)) || t.opening_hours);
     add('Kostenpflichtig', jaNein(t.fee));
+    add('Bezahlen', t.payment?.replace(/;/g, ', '));
   }
   if (!['geldautomat', 'ladesaeule', 'packstation'].includes(it.c)) add('Betreiber', t.operator);
   add('Adresse', addressOf(t));
@@ -241,7 +245,7 @@ const map = new maplibregl.Map({
   pitchWithRotate: false,
 });
 map.touchZoomRotate.disableRotation();
-map.addControl(new maplibregl.AttributionControl({ compact: true }), 'bottom-left');
+
 
 function markerImage(cat) {
   return new Promise((resolve) => {
@@ -548,15 +552,22 @@ function openDetail(it, fly = false) {
     <dl class="facts">${factsOf(it).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
     <div class="actions">
       <a class="btn primary" data-route="${it._i}" href="${routeUrl(it)}" target="_blank" rel="noopener">${ICON_ROUTE}Route</a>
-      <a class="btn" href="${noteUrl(it)}" target="_blank" rel="noopener">${ICON_FLAG}Korrigieren</a>
+      ${!it.src ? `<a class="btn" href="${noteUrl(it)}" target="_blank" rel="noopener">${ICON_FLAG}Korrigieren</a>` : ''}
     </div>
     ${state.nav ? `<div class="navpref">Navigation mit ${esc(NAV[state.nav].name)} · <button id="navchange">ändern</button></div>` : ''}
-    <div class="src">Quelle: <a href="https://www.openstreetmap.org/${{ n: 'node', w: 'way', r: 'relation' }[it.id[0]]}/${it.id.slice(1)}" target="_blank" rel="noopener">OpenStreetMap</a>${checked ? ` · vor Ort geprüft ${esc(fmtDate(checked))}` : ''}</div>
+    <div class="src">${sourceLine(it, checked)}</div>
   </div>`;
   $('#close').addEventListener('click', closeDetail);
   $('#navchange')?.addEventListener('click', () => openChooser(null));
   layoutSheet();
   if (fly) map.easeTo({ center: [it.lon, it.lat], zoom: Math.max(map.getZoom(), 16) });
+}
+function sourceLine(it, checked) {
+  const S = state.index?.sources || {};
+  const parts = [];
+  if (!it.src) parts.push(`<a href="https://www.openstreetmap.org/${{ n: 'node', w: 'way', r: 'relation' }[it.id[0]]}/${it.id.slice(1)}" target="_blank" rel="noopener">OpenStreetMap</a>`);
+  for (const k of [it.src, it.src2].filter(Boolean)) if (S[k]) parts.push(`<a href="${S[k].url}" target="_blank" rel="noopener">${esc(S[k].name)}</a> (${esc(S[k].license)})`);
+  return `Quelle: ${parts.join(' · ')}${checked ? ` · vor Ort geprüft ${esc(fmtDate(checked))}` : ''}`;
 }
 function closeDetail() {
   state.selected = null;
@@ -600,6 +611,9 @@ async function init() {
     const res = await fetch('data/index.json', { cache: 'no-cache' });
     if (!res.ok) throw new Error(res.status);
     state.index = await res.json();
+    const extra = Object.entries(state.index.sources || {}).filter(([k]) => k !== 'osm')
+      .map(([, v]) => `<a href="${v.url}" target="_blank" rel="noopener">${esc(v.name)}</a> (${esc(v.license)})`);
+    map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: extra.length ? 'Weitere Daten: ' + extra.join(', ') : undefined }), 'bottom-left');
     const g = new Date(state.index.generated);
     $('#stand').innerHTML = `Stand<br>${g.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}`;
     body.innerHTML = '<div class="empty">Orte werden geladen …</div>';
