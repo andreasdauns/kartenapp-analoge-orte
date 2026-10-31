@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+  <title>Analoge Orte</title>
+  <meta name="description" content="Briefkästen, Glascontainer, Toiletten und mehr auf einer Karte – mit Leerungs- und Öffnungszeiten.">
+  <meta name="theme-color" content="#173B2C">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="vendor/maplibre-gl.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div id="map" aria-label="Karte"></div>
+
+  <header class="top">
+    <div class="brand">
+      <span class="logo" aria-hidden="true"></span>
+      <div>
+        <div class="title">Analoge Orte</div>
+        <div class="sub" id="stand">Daten werden geladen …</div>
+      </div>
+    </div>
+    <nav class="chips" id="chips" aria-label="Kategorien"></nav>
+  </header>
+
+  <div class="fabs">
+    <button class="fab" id="btn-locate" aria-label="Meinen Standort zeigen">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+    </button>
+  </div>
+
+  <section class="sheet" id="sheet" aria-live="polite">
+    <button class="grip" id="grip" aria-label="Liste aus- oder einklappen"><span></span></button>
+    <div id="sheet-body"></div>
+  </section>
+
+  <script src="vendor/maplibre-gl.js"></script>
+  <script type="module" src="src/app.js"></script>
+</body>
+</html>
