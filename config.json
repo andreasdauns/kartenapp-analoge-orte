@@ -1,5 +1,9 @@
 {
-  "name": "Bad Neuenahr-Ahrweiler",
-  "center": { "lat": 50.5446, "lon": 7.1136 },
-  "radiusKm": 10
+  "regions": [
+    { "name": "Nordrhein-Westfalen", "url": "https://download.geofabrik.de/europe/germany/nordrhein-westfalen-latest.osm.pbf" },
+    { "name": "Hessen", "url": "https://download.geofabrik.de/europe/germany/hessen-latest.osm.pbf" },
+    { "name": "Rheinland-Pfalz", "url": "https://download.geofabrik.de/europe/germany/rheinland-pfalz-latest.osm.pbf" }
+  ],
+  "tileDeg": 0.25,
+  "start": { "name": "Bad Neuenahr-Ahrweiler", "lat": 50.5446, "lon": 7.1136 }
 }

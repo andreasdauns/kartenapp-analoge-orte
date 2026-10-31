@@ -42,7 +42,7 @@ export const CATEGORIES = [
     icon: svg('<path d="M12 2.5l8.5 4.5v10L12 21.5 3.5 17V7z"/><path d="M3.5 7L12 11.5 20.5 7M12 11.5v10"/>'),
   },
   {
-    id: 'geldautomat', label: 'Geldautomat', plural: 'Geldautomaten',
+    id: 'geldautomat', label: 'ATM', plural: 'ATMs',
     color: '#8A4B12', ink: '#FFFFFF',
     icon: txt('€', 15),
   },
@@ -71,11 +71,11 @@ export function classify(tags = {}) {
   if (a === 'toilets' && !noAccess) out.push('toilette');
   if (tags.highway === 'rest_area' || tags.highway === 'services') out.push('rastplatz');
   if (a === 'parcel_locker' || (a === 'vending_machine' && /parcel/.test(tags.vending || ''))) out.push('packstation');
-  if (a === 'atm' || (a === 'bank' && yes(tags.atm))) out.push('geldautomat');
+  if (a === 'atm' || (a === 'bank' && tags.atm !== 'no')) out.push('geldautomat');
   if (a === 'charging_station' && !noAccess) out.push('ladesaeule');
   return out;
 }
 
 // Tags, die in die App übernommen werden (der Rest wird verworfen, um die Datei klein zu halten).
 export const KEEP_TAG = (k) =>
-  /^(name|operator|brand|ref|collection_times|opening_hours|fee|charge|wheelchair|changing_table|centralkey|access|check_date.*|survey:date|capacity|recycling_type|recycling:.*|toilets.*|drive_through|description|level|addr:.*|amenity|highway|vending|socket:.*|motorcar|cash_in|indoor|unisex|male|female|post_box:type|parcel_mail_in|parcel_pickup|website)$/.test(k);
+  /^(name|operator|brand|ref|collection_times|opening_hours|fee|charge|wheelchair|changing_table|centralkey|access|check_date.*|survey:date|capacity|recycling_type|recycling:.*|toilets.*|drive_through|description|level|addr:.*|amenity|highway|vending|socket:.*|motorcar|cash_in|indoor|unisex|male|female|post_box:type|parcel_mail_in|parcel_pickup|website|atm|ref:.*)$/.test(k);

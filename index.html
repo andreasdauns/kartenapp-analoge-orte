@@ -18,12 +18,13 @@
   <div id="map" aria-label="Karte"></div>
 
   <header class="top">
-    <div class="brand">
+    <div class="loc">
       <span class="logo" aria-hidden="true"></span>
-      <div>
-        <div class="title">Analoge Orte</div>
-        <div class="sub" id="stand">Daten werden geladen …</div>
+      <div class="loc-text">
+        <div class="over" id="loc-over">Kartenmitte</div>
+        <div class="title" id="loc-name">Analoge Orte</div>
       </div>
+      <div class="stand" id="stand"></div>
     </div>
     <nav class="chips" id="chips" aria-label="Kategorien"></nav>
   </header>
@@ -35,9 +36,20 @@
   </div>
 
   <section class="sheet" id="sheet" aria-live="polite">
-    <button class="grip" id="grip" aria-label="Liste aus- oder einklappen"><span></span></button>
+    <div class="grip" id="grip" role="button" tabindex="0" aria-label="Liste aus- oder einklappen"><span></span></div>
     <div id="sheet-body"></div>
   </section>
+
+  <div class="chooser" id="chooser" hidden>
+    <div class="chooser-card" role="dialog" aria-modal="true" aria-labelledby="chooser-h">
+      <h2 id="chooser-h">Womit möchtest du navigieren?</h2>
+      <p>Du kannst das später jederzeit ändern.</p>
+      <button class="btn" data-nav="google">Google Maps</button>
+      <button class="btn" data-nav="apple">Apple Karten</button>
+      <button class="btn" data-nav="waze">Waze</button>
+      <button class="link" data-nav="">Abbrechen</button>
+    </div>
+  </div>
 
   <script src="vendor/maplibre-gl.js"></script>
   <script type="module" src="src/app.js"></script>
