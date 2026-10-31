@@ -96,7 +96,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .facts dt { color: var(--muted); }
 .facts dd { margin: 0; font-weight: 550; }
 .actions { display: flex; gap: 8px; }
-.btn { flex: 1; height: 50px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); font-weight: 650; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; color: var(--ink); }
+.btn { flex: 1; height: 50px; border-radius: 14px; border: 1px solid var(--line); background: var(--card); font-weight: 650; font-size: 15px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; text-decoration: none; color: var(--ink); white-space: nowrap; }
 .btn svg { width: 20px; height: 20px; }
 .btn.primary { flex: 2; background: var(--accent); color: #fff; border-color: transparent; }
 @media (prefers-color-scheme: dark) { .btn.primary { color: #10180F; } }
@@ -105,5 +105,5 @@ button { font: inherit; color: inherit; cursor: pointer; }
 
 /* Karte */
 .maplibregl-ctrl-attrib { font-size: 10.5px; }
-.maplibregl-ctrl-bottom-right { bottom: var(--sheet-h, 170px); transition: bottom .25s; }
-@media (min-width: 720px) { .maplibregl-ctrl-bottom-right { bottom: 0; } }
+.maplibregl-ctrl-bottom-left { bottom: var(--sheet-h, 170px); transition: bottom .25s; }
+@media (min-width: 720px) { .maplibregl-ctrl-bottom-left { bottom: 0; left: auto; right: 70px; } }

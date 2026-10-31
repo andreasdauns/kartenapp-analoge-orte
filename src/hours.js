@@ -139,7 +139,7 @@ export function weekSummary(parsed) {
   if (parsed.always) return '24 Stunden, 7 Tage';
   const fmt = (slots) =>
     slots.length === 0
-      ? 'geschlossen'
+      ? (parsed.kind === 'points' ? 'keine' : 'geschlossen')
       : slots.map((s) => (Array.isArray(s) ? `${hhmm(s[0])}–${hhmm(s[1])}` : hhmm(s))).join(', ');
   const rows = [];
   let i = 0;

@@ -1,0 +1,18 @@
+{
+  "name": "Analoge Orte",
+  "short_name": "Analoge Orte",
+  "description": "Briefkästen, Glascontainer, Toiletten und mehr auf einer Karte – mit Leerungs- und Öffnungszeiten.",
+  "lang": "de",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#EEF2EE",
+  "theme_color": "#173B2C",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ]
+}

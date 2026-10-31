@@ -201,7 +201,7 @@ map.touchZoomRotate.disableRotation();
 map.addControl(new maplibregl.AttributionControl({
   compact: true,
   customAttribution: '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap-Mitwirkende</a> · <a href="https://openfreemap.org" target="_blank" rel="noopener">OpenFreeMap</a>',
-}), 'bottom-right');
+}), 'bottom-left');
 
 function markerImage(cat) {
   return new Promise((resolve) => {
@@ -244,6 +244,7 @@ async function setupLayers() {
     map.addSource('me', { type: 'geojson', data: { type: 'FeatureCollection', features: [] } });
     map.addLayer({ id: 'me-halo', type: 'circle', source: 'me', paint: { 'circle-radius': 16, 'circle-color': '#1A73E8', 'circle-opacity': 0.18 } });
     map.addLayer({ id: 'me', type: 'circle', source: 'me', paint: { 'circle-radius': 7, 'circle-color': '#1A73E8', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2.5 } });
+    if (state.me) map.getSource('me').setData({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [state.me.lon, state.me.lat] } }] });
     map.addSource('pois', { type: 'geojson', data: geojson() });
     map.addLayer({
       id: 'pois', type: 'symbol', source: 'pois',
@@ -305,7 +306,11 @@ try {
 
 // ---------- Unteres Blatt ----------
 const sheet = $('#sheet'), body = $('#sheet-body');
-new ResizeObserver(() => document.documentElement.style.setProperty('--sheet-h', `${sheet.offsetHeight}px`)).observe(sheet);
+new ResizeObserver(() => {
+  document.documentElement.style.setProperty('--sheet-h', `${sheet.offsetHeight}px`);
+  const wide = innerWidth >= 720;
+  map.setPadding({ top: 110, bottom: wide ? 0 : Math.min(sheet.offsetHeight, innerHeight * 0.5), left: wide ? 420 : 0, right: 0 });
+}).observe(sheet);
 $('#grip').addEventListener('click', () => { state.expanded = !state.expanded; if (!state.selected) renderList(); });
 
 function alertSheet(msg) {
@@ -355,7 +360,7 @@ function openDetail(it, fly = false) {
   const chips = [st, ...extraChips(it)].filter(Boolean);
   const ref = refPoint();
   map.getSource('sel')?.setData({ type: 'FeatureCollection', features: [{ type: 'Feature', properties: {}, geometry: { type: 'Point', coordinates: [it.lon, it.lat] } }] });
-  if (fly) map.easeTo({ center: [it.lon, it.lat], zoom: Math.max(map.getZoom(), 16), padding: { bottom: 260 } });
+  if (fly) map.easeTo({ center: [it.lon, it.lat], zoom: Math.max(map.getZoom(), 16) });
   const checked = it.t.check_date || it.t['survey:date'];
   body.innerHTML = `<div class="detail">
     <div class="detail-h">
@@ -367,7 +372,7 @@ function openDetail(it, fly = false) {
     <dl class="facts">${factsOf(it).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
     <div class="actions">
       <a class="btn primary" href="${routeUrl(it)}" target="_blank" rel="noopener">${ICON_ROUTE}Route</a>
-      <a class="btn" href="${noteUrl(it)}" target="_blank" rel="noopener">${ICON_FLAG}Fehler melden</a>
+      <a class="btn" href="${noteUrl(it)}" target="_blank" rel="noopener">${ICON_FLAG}Korrigieren</a>
     </div>
     <div class="src">Quelle: <a href="https://www.openstreetmap.org/${{ n: 'node', w: 'way', r: 'relation' }[it.id[0]]}/${it.id.slice(1)}" target="_blank" rel="noopener">OpenStreetMap</a>${checked ? ` · vor Ort geprüft ${esc(fmtDate(checked))}` : ''}</div>
   </div>`;
