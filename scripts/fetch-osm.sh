@@ -10,8 +10,9 @@ for url in $(jq -r '.regions[].url' config.json); do
   echo "Lade $url"
   curl -sSfL --retry 3 -A "analoge-orte (github.com/andreasdauns/kartenapp-analoge-orte)" -o "work/r$i.pbf" "$url"
   osmium tags-filter "work/r$i.pbf" \
-    nwr/amenity=post_box,recycling,toilets,parcel_locker,vending_machine,atm,bank,charging_station \
+    nwr/amenity=post_box,post_office,recycling,toilets,parcel_locker,vending_machine,atm,bank,charging_station \
     nwr/highway=rest_area,services \
+    nwr/post_office nwr/post_office:type nwr/post_office:brand \
     n/place=city,town,village,suburb \
     -o "work/f$i.pbf" --overwrite
   rm "work/r$i.pbf"

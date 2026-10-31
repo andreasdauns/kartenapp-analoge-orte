@@ -6,7 +6,7 @@
 import { createReadStream } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import readline from 'node:readline';
-import { classify, KEEP_TAG } from '../src/categories.js';
+import { classify, KEEP_TAG, parcelInfo } from '../src/categories.js';
 import { loadExternal, SOURCES } from './external.mjs';
 
 const root = new URL('../', import.meta.url);
@@ -52,7 +52,14 @@ for await (let line of rl) {
   if (!cats.length) continue;
   const t = {};
   for (const [k, v] of Object.entries(tags)) if (KEEP_TAG(k)) t[k] = v;
-  for (const c of cats) items.push({ id: `${type[0]}${id}`, c, lat, lon, t });
+  for (const c of cats) {
+    const it = { id: `${type[0]}${id}`, c, lat, lon, t };
+    if (c === 'packstation' || c === 'paketshop') {
+      const p = parcelInfo(tags);
+      it.pk = p.kind; it.pv = p.pv; it.ps = p.send;
+    }
+    items.push(it);
+  }
 }
 
 // Bankfilialen ohne eigenen Automaten-Eintrag nur zeigen, wenn kein separater ATM in der Nähe ist

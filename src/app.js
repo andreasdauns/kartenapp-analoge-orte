@@ -1,4 +1,4 @@
-import { CATEGORIES, CATEGORY_BY_ID } from './categories.js';
+import { CATEGORIES, CATEGORY_BY_ID, PROVIDERS } from './categories.js';
 import { parseHours, nextPoint, openState, weekSummary } from './hours.js';
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
@@ -31,7 +31,13 @@ const state = {
   selected: null,
   mode: 'peek', // peek | full
   nav: store.get('navApp', null), // google | apple | waze
+  providers: new Set(store.get('providers', PROVIDERS.map((p) => p.id)).filter((id) => PROVIDERS.some((p) => p.id === id))),
 };
+if (!state.providers.size) PROVIDERS.forEach((p) => state.providers.add(p.id));
+const PROV = Object.fromEntries(PROVIDERS.map((p) => [p.id, p]));
+const PARCEL = ['packstation', 'paketshop'];
+const allProviders = () => state.providers.size === PROVIDERS.length;
+const passes = (it) => state.active.has(it.c) && (!PARCEL.includes(it.c) || allProviders() || (it.pv || []).some((p) => state.providers.has(p)));
 if (!state.active.size) CATEGORIES.forEach((c) => state.active.add(c.id));
 
 // ---------- Hilfsfunktionen ----------
@@ -71,9 +77,12 @@ function titleOf(it) {
   const t = it.t;
   switch (it.c) {
     case 'packstation': {
+      if (it.pk === 'poststation') return `Poststation${t.ref ? ' ' + t.ref : ''}`;
       const b = t.brand || t.operator || '';
-      return /dhl|deutsche post/i.test(b) || /packstation/i.test(t.name || '') ? `Packstation${t.ref ? ' ' + t.ref : ''}` : (b || t.name || 'Paketautomat');
+      if ((it.pv || []).includes('dhl') && !/deinfach/i.test(b)) return `Packstation${t.ref ? ' ' + t.ref : ''}`;
+      return b || t.name || 'Paketstation';
     }
+    case 'paketshop': return it.pk === 'filiale' ? 'Postfiliale' : 'Paketshop';
     case 'geldautomat': return 'ATM';
     case 'ladesaeule': return 'Ladesäule';
     case 'briefkasten': return 'Briefkasten';
@@ -87,6 +96,10 @@ function subOf(it) {
   const t = it.t;
   const parts = [];
   if (it.c === 'geldautomat') parts.push(t.brand || t.operator || t.name);
+  if (PARCEL.includes(it.c)) {
+    if (it.c === 'paketshop' && t.name && !/paket|post|hermes|dpd|gls|ups/i.test(t.name)) parts.push(t.name);
+    parts.push((it.pv || []).map((p) => PROV[p]?.label).filter(Boolean).join(', '));
+  }
   if (it.c === 'ladesaeule') {
     const kw = Math.max(0, ...Object.keys(t).filter((k) => /^socket:.+:output$/.test(k)).map((k) => parseFloat(t[k]) || 0));
     parts.push([t.operator || t.brand, kw ? `${kw} kW` : null].filter(Boolean).join(' · '));
@@ -168,11 +181,14 @@ function factsOf(it) {
     add('Stellplätze', t['autobahn:info']);
     add('Fahrtrichtung', t.ref);
   }
-  if (it.c === 'packstation') {
-    add('Anbieter', t.brand || t.operator);
+  if (PARCEL.includes(it.c)) {
+    add('Art', { filiale: 'Postfiliale (Partnerfiliale)', paketshop: 'Paketshop', station: 'Paketstation', poststation: 'Poststation (mit Briefmarken & Briefkasten)' }[it.pk]);
+    add('Anbieter', (it.pv || []).map((p) => PROV[p]?.label).join(', '));
+    add('Geschäft', it.c === 'paketshop' ? t.name : null);
     add('Nummer', t.ref);
+    add('Pakete abgeben', { yes: 'ja', no: 'nein, nur abholen', returns: 'nur Retouren' }[it.ps]);
+    add('Briefmarken', t['post_office:stamps'] ? 'ja' : null);
     add('Öffnungszeiten', weekSummary(parseHours(t.opening_hours)) || t.opening_hours);
-    add('Pakete abschicken', jaNein(t.parcel_mail_in));
   }
   if (it.c === 'geldautomat') {
     add('Bank', t.brand || t.operator || t.name);
@@ -190,7 +206,7 @@ function factsOf(it) {
     add('Kostenpflichtig', jaNein(t.fee));
     add('Bezahlen', t.payment?.replace(/;/g, ', '));
   }
-  if (!['geldautomat', 'ladesaeule', 'packstation'].includes(it.c)) add('Betreiber', t.operator);
+  if (!['geldautomat', 'ladesaeule', 'packstation', 'paketshop'].includes(it.c)) add('Betreiber', t.operator);
   add('Adresse', addressOf(t));
   add('Ort', it.place || (it.place = nearestPlace(it)));
   add('Hinweis', t.description);
@@ -217,6 +233,26 @@ function renderChips() {
       <span class="ic">${c.icon}</span>${esc(c.plural)}
     </button>`).join('');
 }
+function renderProviders() {
+  const show = PARCEL.some((c) => state.active.has(c)) && state.active.size <= 3;
+  $('#providers').hidden = !show;
+  $('#providers').innerHTML = PROVIDERS.map((p) => `<button class="chip pv" data-pv="${p.id}" aria-pressed="${!allProviders() && state.providers.has(p.id)}">${esc(p.label)}</button>`).join('');
+  layoutSheet();
+}
+$('#providers').addEventListener('click', (e) => {
+  const b = e.target.closest('.chip');
+  if (!b) return;
+  const id = b.dataset.pv;
+  if (allProviders()) state.providers = new Set([id]);
+  else if (state.providers.has(id)) {
+    state.providers.delete(id);
+    if (!state.providers.size) PROVIDERS.forEach((p) => state.providers.add(p.id));
+  } else state.providers.add(id);
+  store.set('providers', [...state.providers]);
+  renderProviders();
+  applyFilter();
+  if (!state.selected) renderList();
+});
 $('#chips').addEventListener('click', (e) => {
   const b = e.target.closest('.chip');
   if (!b) return;
@@ -228,6 +264,7 @@ $('#chips').addEventListener('click', (e) => {
   } else state.active.add(id);
   store.set('active', [...state.active]);
   renderChips();
+  renderProviders();
   applyFilter();
   if (state.selected && !state.active.has(state.selected.c)) closeDetail();
   else if (!state.selected) renderList();
@@ -266,10 +303,13 @@ function markerImage(cat) {
 
 const fc = (features) => ({ type: 'FeatureCollection', features });
 const pointF = (lon, lat, props = {}) => ({ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: [lon, lat] } });
-const geojson = () => fc(state.items.map((it, i) => pointF(it.lon, it.lat, { c: it.c, i })));
+const geojson = () => fc(state.items.map((it, i) => pointF(it.lon, it.lat, { c: it.c, i, pv: it.pv ? `|${it.pv.join('|')}|` : '' })));
 
 function applyFilter() {
-  if (map.getLayer('pois')) map.setFilter('pois', ['in', ['get', 'c'], ['literal', [...state.active]]]);
+  if (!map.getLayer('pois')) return;
+  const cats = ['in', ['get', 'c'], ['literal', [...state.active]]];
+  if (allProviders()) { map.setFilter('pois', cats); return; }
+  map.setFilter('pois', ['all', cats, ['any', ['!', ['in', ['get', 'c'], ['literal', PARCEL]]], ...[...state.providers].map((p) => ['in', `|${p}|`, ['get', 'pv']])]]);
 }
 
 async function setupLayers() {
@@ -428,7 +468,7 @@ function layoutSheet() {
   sheet.classList.toggle('peek', !full && !state.selected);
   document.documentElement.style.setProperty('--sheet-max', `${sheetMax()}px`);
   setVisible(h);
-  const pad = { top: 120, bottom: Math.round(wide() ? 0 : Math.min(h, innerHeight * 0.5)), left: wide() ? 420 : 0, right: 0 };
+  const pad = { top: Math.round($('.top').offsetHeight + 8), bottom: Math.round(wide() ? 0 : Math.min(h, innerHeight * 0.5)), left: wide() ? 420 : 0, right: 0 };
   const cur = map.getPadding();
   if (cur.top !== pad.top || cur.bottom !== pad.bottom || cur.left !== pad.left) map.setPadding(pad);
 }
@@ -505,25 +545,32 @@ function rowHtml(it, ref) {
   </div>`;
 }
 
+function providerHint() {
+  if (allProviders() || !PARCEL.some((c) => state.active.has(c))) return '';
+  const weak = [...state.providers].filter((p) => p !== 'dhl' && PROV[p]?.finder);
+  if (!weak.length) return '';
+  return `<div class="hint">${esc(weak.map((p) => PROV[p].label).join(', '))}: Shops sind in den Kartendaten nur teilweise erfasst. Offizielle Suche: ${weak.map((p) => `<a href="${PROV[p].finder}" target="_blank" rel="noopener">${esc(PROV[p].label)} ↗</a>`).join(' · ')}</div>`;
+}
 function renderList() {
   if (!state.index) return;
   const ref = refPoint();
   const box = 0.25;
   const near = [];
   state.items.forEach((it, i) => {
-    if (!state.active.has(it.c) || Math.abs(it.lat - ref.lat) > box || Math.abs(it.lon - ref.lon) > box * 1.5) return;
+    if (!passes(it) || Math.abs(it.lat - ref.lat) > box || Math.abs(it.lon - ref.lon) > box * 1.5) return;
     it._i = i;
     near.push({ it, d: distM(ref, it) });
   });
   near.sort((a, b) => a.d - b.d);
   const list = near.slice(0, LIST_LIMIT);
-  const only = state.active.size === 1 ? CATEGORY_BY_ID[[...state.active][0]].plural : 'Orte';
+  const only = state.active.size === 1 ? CATEGORY_BY_ID[[...state.active][0]].plural : [...state.active].every((c) => PARCEL.includes(c)) ? 'Paketstellen' : 'Orte';
   const loadingHere = keysAround(ref.lat, ref.lon, 0).some((k) => state.loading.has(k));
   const empty = loadingHere ? 'Orte werden geladen …' : (tileKey(ref.lat, ref.lon) in state.index.tiles ? 'In der Nähe ist nichts eingetragen.' : 'Dieses Gebiet ist noch nicht in der App (bisher: ' + state.index.regions.join(', ') + ').');
   body.innerHTML = `
     <div class="sheet-h"><h2>Nächste ${esc(only)}</h2><span class="from">${ref.mine ? 'von dir aus' : 'ab Kartenmitte'}</span></div>
     ${list.length ? list.map((x) => rowHtml(x.it, ref)).join('') : `<div class="empty">${esc(empty)}</div>`}
-    ${list.length > PEEK_ROWS && state.mode === 'peek' ? '<div class="hint">Nach oben ziehen für mehr</div>' : ''}`;
+    ${list.length > PEEK_ROWS && state.mode === 'peek' ? '<div class="hint">Nach oben ziehen für mehr</div>' : ''}
+    ${providerHint()}`;
   layoutSheet();
 }
 body.addEventListener('click', (e) => {
@@ -607,6 +654,7 @@ $('#chooser').addEventListener('click', (e) => {
 // ---------- Start ----------
 async function init() {
   renderChips();
+  renderProviders();
   try {
     const res = await fetch('data/index.json', { cache: 'no-cache' });
     if (!res.ok) throw new Error(res.status);
