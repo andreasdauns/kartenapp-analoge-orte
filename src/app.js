@@ -74,7 +74,9 @@ function statusOf(it, now = new Date()) {
       return { cls: s.open ? 'ok' : 'bad', text: s.text };
     }
   }
+  if (t.opening_hours && /geschlossen|closed/i.test(t.opening_hours)) return { cls: 'bad', text: t.opening_hours.replace(/"/g, '') };
   if (it.c === 'toilette') {
+    if (t.access === 'permit') return { cls: 'warn', text: 'nur mit Erlaubnis' };
     if (t.access === 'customers') return { cls: 'warn', text: 'nur für Kunden' };
     if (t.fee === 'no') return { cls: 'ok', text: 'kostenlos' };
     if (t.fee === 'yes') return { cls: '', text: t.charge ? `Gebühr ${t.charge}` : 'kostenpflichtig' };
