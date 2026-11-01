@@ -26,20 +26,18 @@ const state = {
   places: [],
   loaded: new Set(),
   loading: new Set(),
-  active: new Set(store.get('active', CATEGORIES.map((c) => c.id)).filter((id) => CATEGORY_BY_ID[id])),
+  active: new Set(store.get('cats', []).filter((id) => CATEGORY_BY_ID[id])), // beim ersten Start: nichts ausgewählt
   me: null,
   watchId: null,
   selected: null,
   mode: 'peek', // peek | full
   nav: store.get('navApp', null), // google | apple | waze
-  providers: new Set(store.get('providers', PROVIDERS.map((p) => p.id)).filter((id) => PROVIDERS.some((p) => p.id === id))),
+  providers: new Set(store.get('prov', []).filter((id) => PROVIDERS.some((p) => p.id === id))), // leer = alle Anbieter
 };
-if (!state.providers.size) PROVIDERS.forEach((p) => state.providers.add(p.id));
 const PROV = Object.fromEntries(PROVIDERS.map((p) => [p.id, p]));
 const PARCEL = ['packstation', 'paketshop'];
-const allProviders = () => state.providers.size === PROVIDERS.length;
+const allProviders = () => state.providers.size === 0;
 const passes = (it) => state.active.has(it.c) && (!PARCEL.includes(it.c) || allProviders() || (it.pv || []).some((p) => state.providers.has(p)));
-if (!state.active.size) CATEGORIES.forEach((c) => state.active.add(c.id));
 
 // ---------- Hilfsfunktionen ----------
 function distM(a, b) {
@@ -235,21 +233,17 @@ function renderChips() {
     </button>`).join('');
 }
 function renderProviders() {
-  const show = PARCEL.some((c) => state.active.has(c)) && state.active.size <= 3;
+  const show = PARCEL.some((c) => state.active.has(c));
   $('#providers').hidden = !show;
-  $('#providers').innerHTML = PROVIDERS.map((p) => `<button class="chip pv" data-pv="${p.id}" aria-pressed="${!allProviders() && state.providers.has(p.id)}">${esc(p.label)}</button>`).join('');
+  $('#providers').innerHTML = PROVIDERS.map((p) => `<button class="chip pv" data-pv="${p.id}" aria-pressed="${state.providers.has(p.id)}">${esc(p.label)}</button>`).join('');
   layoutSheet();
 }
 $('#providers').addEventListener('click', (e) => {
   const b = e.target.closest('.chip');
   if (!b) return;
   const id = b.dataset.pv;
-  if (allProviders()) state.providers = new Set([id]);
-  else if (state.providers.has(id)) {
-    state.providers.delete(id);
-    if (!state.providers.size) PROVIDERS.forEach((p) => state.providers.add(p.id));
-  } else state.providers.add(id);
-  store.set('providers', [...state.providers]);
+  if (state.providers.has(id)) state.providers.delete(id); else state.providers.add(id); // einfach an/aus
+  store.set('prov', [...state.providers]);
   renderProviders();
   applyFilter();
   if (!state.selected) renderList();
@@ -258,12 +252,8 @@ $('#chips').addEventListener('click', (e) => {
   const b = e.target.closest('.chip');
   if (!b) return;
   const id = b.dataset.id;
-  if (state.active.size === CATEGORIES.length) state.active = new Set([id]); // erster Tipp: nur diese
-  else if (state.active.has(id)) {
-    state.active.delete(id);
-    if (!state.active.size) CATEGORIES.forEach((c) => state.active.add(c.id));
-  } else state.active.add(id);
-  store.set('active', [...state.active]);
+  if (state.active.has(id)) state.active.delete(id); else state.active.add(id); // jede Kategorie einzeln an/aus
+  store.set('cats', [...state.active]);
   renderChips();
   renderProviders();
   applyFilter();
@@ -561,11 +551,16 @@ function renderList() {
   });
   near.sort((a, b) => a.d - b.d);
   const list = near.slice(0, LIST_LIMIT);
+  if (!state.active.size) {
+    body.innerHTML = '<div class="sheet-h"><h2>Was suchst du?</h2></div><div class="empty">Tippe oben auf eine oder mehrere Kategorien, z. B. Briefkästen oder Glascontainer.</div>';
+    layoutSheet();
+    return;
+  }
   const only = state.active.size === 1 ? CATEGORY_BY_ID[[...state.active][0]].plural : [...state.active].every((c) => PARCEL.includes(c)) ? 'Paketstellen' : 'Orte';
   const loadingHere = keysAround(ref.lat, ref.lon, 0).some((k) => state.loading.has(k));
   const empty = loadingHere ? 'Orte werden geladen …' : (tileKey(ref.lat, ref.lon) in state.index.tiles ? 'In der Nähe ist nichts eingetragen.' : 'Dieses Gebiet ist noch nicht in der App (bisher: ' + state.index.regions.join(', ') + ').');
   body.innerHTML = `
-    <div class="sheet-h"><h2>Nächste ${esc(only)}</h2><span class="from">${ref.mine ? 'von dir aus' : 'ab Kartenmitte'}</span></div>
+    <div class="sheet-h"><h2>Nächste ${esc(only)}</h2><span class="from">${ref.mine ? '' : 'ab Kartenmitte'}</span></div>
     ${list.length ? list.map((x) => rowHtml(x.it, ref)).join('') : `<div class="empty">${esc(empty)}</div>`}
     ${list.length > PEEK_ROWS && state.mode === 'peek' ? '<div class="hint">Nach oben ziehen für mehr</div>' : ''}
     ${providerHint()}`;
@@ -817,6 +812,7 @@ function openAdd() {
     state.selected = null;
     await submit({ place_id: id, category: cat, kind: 'new', lat: +c.lat.toFixed(6), lon: +c.lng.toFixed(6), message: msg || null }, 'Danke! Der Ort ist eingetragen und wartet auf Bestätigung.');
     state.active.add(cat);
+    store.set('cats', [...state.active]);
     renderChips(); applyFilter();
   });
   layoutSheet();
