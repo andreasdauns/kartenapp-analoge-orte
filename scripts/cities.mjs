@@ -51,6 +51,73 @@ const container = (kind, o = {}) => ({ amenity: 'recycling', recycling_type: 'co
 
 const wfs = (base, type, v = '2.0.0') => `${base}${base.includes('?') ? '&' : '?'}service=WFS&version=${v}&request=GetFeature&${v === '2.0.0' ? 'typeNames' : 'typeName'}=${encodeURIComponent(type)}&outputFormat=application/json&srsName=EPSG:4326`;
 
+
+// ---------- Hilfen für weitere Quellen ----------
+function parseCsv(text) {
+  text = text.replace(/^\uFEFF/, '');
+  const first = text.split(/\r?\n/, 1)[0];
+  const sep = (first.match(/;/g) || []).length > (first.match(/,/g) || []).length ? ';' : ',';
+  const rows = [];
+  let row = [], cur = '', q = false;
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) { if (ch === '"') { if (text[i + 1] === '"') { cur += '"'; i++; } else q = false; } else cur += ch; }
+    else if (ch === '"') q = true;
+    else if (ch === sep) { row.push(cur); cur = ''; }
+    else if (ch === '\n') { row.push(cur.replace(/\r$/, '')); rows.push(row); row = []; cur = ''; }
+    else cur += ch;
+  }
+  if (cur || row.length) { row.push(cur); rows.push(row); }
+  const head = rows.shift().map((h) => h.trim());
+  return rows.filter((r) => r.length > 1).map((r) => Object.fromEntries(head.map((h, i) => [h, (r[i] ?? '').trim()])));
+}
+const numDE = (v) => parseFloat(String(v ?? '').replace(',', '.'));
+// CSV mit Koordinatenspalten (Breite/Länge oder UTM) in Features umwandeln
+async function csvFeatures(url) {
+  const rows = parseCsv(await get(url, 'text'));
+  const keys = Object.keys(rows[0] || {});
+  const find = (re) => keys.find((k) => re.test(k));
+  const kLat = find(/^(lat|latitude|breite|breitengrad|y_?wgs|wgs84_?y|nord_?wgs)$/i) || find(/lat|breite/i);
+  const kLon = find(/^(lon|lng|long|longitude|laenge|länge|laengengrad|längengrad|x_?wgs|wgs84_?x)$/i) || find(/lon|lng|länge|laenge/i);
+  const kE = find(/^(x|rechtswert|utm_?east|ostwert|east)$/i), kN = find(/^(y|hochwert|utm_?north|nordwert|north)$/i);
+  return {
+    features: rows.map((p) => {
+      let lat = numDE(p[kLat]), lon = numDE(p[kLon]);
+      if (!(lat > 40 && lat < 60) && kE && kN) { const e = numDE(p[kE]), n = numDE(p[kN]); if (e > 100000) [lat, lon] = utm32ToLatLon(e, n); }
+      if (!(lat > 40 && lat < 60) && lon > 40 && lon < 60) [lat, lon] = [lon, lat];
+      return lat > 40 ? { geometry: { type: 'Point', coordinates: [lon, lat] }, properties: p } : null;
+    }).filter(Boolean),
+  };
+}
+const txtOf = (p) => Object.values(p).filter((v) => typeof v === 'string').join(' ');
+// Container-Arten aus beliebigen Feldern erkennen
+function containersFrom(p, operator, fallback = null) {
+  const out = [];
+  const flag = (re) => Object.entries(p).some(([k, v]) => re.test(k) && (v === true || Number(v) > 0 || /^(ja|x|yes|1|true)$/i.test(String(v))));
+  const t = txtOf(p);
+  const desc = p.standort || p.Standort || p.strasse || p.Strasse || p.STANDORT || p.BEZEICHNUNG || p.bezeichnung || p.adresse || p.Adresse || p.LAGEBESCHREIBUNG || undefined;
+  const hours = hoursDE(p.einwurfzeiten || p.Einwurfzeiten || p.oeffnungszeiten);
+  const add = (c) => out.push({ c, t: container(c, { operator, description: desc, opening_hours: hours }) });
+  if (flag(/glas/i) || /glas|drei-kammer|weiß|weiss.*braun/i.test(t)) add('glas');
+  if (flag(/papier|pappe/i) || /papier|pappe/i.test(t)) add('papier');
+  if (flag(/kleid|textil|schuh/i) || /altkleid|textil|kleider/i.test(t)) add('altkleider');
+  if (!out.length && fallback) add(fallback);
+  return out;
+}
+function kmlFeatures(kml) {
+  const feats = [];
+  for (const pm of kml.split(/<Placemark[\s>]/).slice(1)) {
+    const c = /<coordinates>\s*([-\d.]+),([-\d.]+)/.exec(pm);
+    if (!c) continue;
+    const props = {};
+    for (const m of pm.matchAll(/<SimpleData name="([^"]+)">([^<]*)<\/SimpleData>/g)) props[m[1]] = m[2];
+    const n = /<name>([^<]*)<\/name>/.exec(pm); if (n) props.name = n[1];
+    feats.push({ geometry: { type: 'Point', coordinates: [+c[1], +c[2]] }, properties: props });
+  }
+  return { features: feats };
+}
+const ods = (base, ds) => `${base}/api/v2/catalog/datasets/${ds}/exports/geojson`;
+
 export const CITY_SOURCES = {
   berlin: {
     name: 'Land Berlin (Senatsverwaltung)', license: 'dl-de/zero-2.0', url: 'https://gdi.berlin.de/services/wfs/toiletten',
@@ -161,6 +228,94 @@ export const CITY_SOURCES = {
       if (p._c === 'toilette') return { c: 'toilette', t: toilet({ name, description: p.oeffnungszeiten || p.beschreibung || undefined }) };
       return { c: p._c, t: container(p._c, { operator: 'Stadt Trier', description: name }) };
     },
+  },
+
+  freiburg: {
+    name: 'Stadt Freiburg i. Br.', license: 'dl-de/by-2.0', url: 'https://www.freiburg.de',
+    fetch: async () => {
+      const feats = [];
+      for (const type of ['ms:oeff_toiletten', 'ms:nette_toilette']) {
+        const d = await get(`https://geoportal.freiburg.de/wfs/gmf_toiletten/gmf_toiletten?service=WFS&version=2.0.0&request=GetFeature&typeNames=${type}&outputFormat=geojson&srsName=EPSG:4326`).catch(() => ({ features: [] }));
+        for (const f of d.features || []) feats.push({ ...f, properties: { ...f.properties, _nette: type.includes('nette') } });
+      }
+      return { features: feats };
+    },
+    map: (p) => ({ c: 'toilette', t: toilet({ name: p.name || p.bezeichnung || p.NAME || p.standort, opening_hours: hoursDE(p.oeffnungszeiten || p.OEFFNUNGSZEITEN), description: p._nette ? 'Nette Toilette (in Gastronomie/Geschäft)' : (p.beschreibung || undefined) }) }),
+  },
+  muenster_wc: {
+    name: 'Stadt Münster', license: 'dl-de/by-2.0', url: 'https://opendata.stadt-muenster.de',
+    fetch: async () => kmlFeatures(await get('https://www.stadt-muenster.de/ows/mapserv706/poiserv?REQUEST=GetFeature&SERVICE=WFS&VERSION=1.0.0&TYPENAME=ms:Toiletten&OUTPUTFORMAT=KML', 'text')),
+    map: (p) => {
+      const days = [['MONTAG', 'Mo'], ['DIENSTAG', 'Tu'], ['MITTWOCH', 'We'], ['DONNERSTAG', 'Th'], ['FREITAG', 'Fr'], ['SAMSTAG', 'Sa'], ['SONNTAG', 'Su']];
+      const oh = days.filter(([k]) => p[k] && /\d/.test(p[k])).map(([k, d]) => `${d} ${hoursDE(p[k])}`).join('; ') || undefined;
+      return { c: 'toilette', t: toilet({ name: p.BEZEICHNUNG || p.NAME || p.name || p.STANDORT, opening_hours: oh, wheelchair: yes(p.BARRIEREFREI), fee: /kostenlos|frei/i.test(p.KOSTEN || '') ? 'no' : undefined }) };
+    },
+  },
+  herne: {
+    name: 'Stadt Herne', license: 'dl-de/zero-2.0', url: 'https://www.herne.de',
+    fetch: async () => {
+      const a = await get('https://geodaten.herne.de/geoserver/soziales/barrierefreietoiletten?SERVICE=WFS&REQUEST=GetFeature&TYPENAME=barrierefreie_toiletten&OUTPUTFORMAT=application/json&srsName=EPSG:4326');
+      const b = await get(wfs('https://geodaten.herne.de/geoserver/abfall/entsorgungskarte', 'wertstoffsammelstelle', '1.1.0')).catch(() => ({ features: [] }));
+      return { features: [...(a.features || []).map((f) => ({ ...f, properties: { ...f.properties, _wc: 1 } })), ...(b.features || [])] };
+    },
+    map: (p) => (p._wc
+      ? { c: 'toilette', t: toilet({ name: p.anzeigenam, description: p.infotxt || undefined, wheelchair: 'yes' }) }
+      : containersFrom(p, 'Entsorgung Herne')),
+  },
+  neuss: {
+    name: 'Stadt Neuss / Rhein-Kreis Neuss', license: 'CC0', url: 'https://opendata.rhein-kreis-neuss.de',
+    fetch: () => get(ods('https://opendata.rhein-kreis-neuss.de', 'stadt-neuss-oeffentliche-toiletten')),
+    map: (p) => ({ c: 'toilette', t: toilet({ name: p.bezeichnung, description: p.category || undefined }) }),
+  },
+  grevenbroich: {
+    name: 'Stadt Grevenbroich', license: 'CC0', url: 'https://opendata.rhein-kreis-neuss.de',
+    fetch: () => get(ods('https://opendata.rhein-kreis-neuss.de', 'grevenbroich-glascontainer-standorte')),
+    map: (p) => ({ c: 'glas', t: container('glas', { operator: 'Stadt Grevenbroich', description: [p.strasse, p.standort].filter(Boolean).join(', ') || undefined }) }),
+  },
+  meerbusch: {
+    name: 'Stadt Meerbusch', license: 'dl-de/zero-2.0', url: 'https://opendata.rhein-kreis-neuss.de',
+    fetch: () => get(ods('https://opendata.rhein-kreis-neuss.de', 'meerbusch-wertstoffcontainer')),
+    map: (p) => containersFrom(p, 'Stadt Meerbusch', 'glas'),
+  },
+  wuerzburg: {
+    name: 'Stadt Würzburg', license: 'dl-de/by-2.0', url: 'https://wuerzburg.opendatasoft.com',
+    fetch: () => get(ods('https://wuerzburg.opendatasoft.com', 'barrierefreie-toiletten-im-stadtgebiet-wuerzburg')),
+    map: (p) => ({ c: 'toilette', t: toilet({ name: p.company || p.toilettype, description: p.description || undefined, wheelchair: 'yes', centralkey: /euro/i.test(p.description || '') && !/ohne euro/i.test(p.description || '') ? 'eurokey' : undefined }) }),
+  },
+  regensburg: {
+    name: 'Stadt Regensburg', license: 'CC BY 4.0', url: 'https://www.regensburg.de/opendata',
+    fetch: () => get('https://mapservice.regensburg.de/cgi-bin/mapserv?map=/data/ows/maps/altglas_wfs.map&service=WFS&version=1.1.0&request=GetFeature&outputformat=geojson&TYPENAME=altglas'),
+    map: (p) => ({ c: 'glas', t: container('glas', { operator: 'Stadt Regensburg', description: p.BEZEICHNUNG || p.LAGEBESCHREIBUNG || undefined }) }),
+  },
+  lk_cham: {
+    name: 'Landratsamt Cham', license: 'CC BY 4.0', url: 'https://data-lra-cha.opendata.arcgis.com',
+    fetch: () => get('https://data-lra-cha.opendata.arcgis.com/api/download/v1/items/46f6b60e560c4d908e423d510d181e4d/geojson?layers=30'),
+    map: (p) => containersFrom({ ...p, standort: [p.BEM, p.ORT_NAM].filter(Boolean).join(', ') }, 'Landkreis Cham', 'glas'),
+  },
+  amberg: {
+    name: 'Stadt Amberg', license: 'CC BY 3.0 DE', url: 'https://amberg.de/opendata',
+    fetch: () => csvFeatures('https://amberg.de/fileadmin/opendata/container.csv'),
+    map: (p) => containersFrom(p, 'Stadt Amberg'),
+  },
+  deggendorf: {
+    name: 'Stadt Deggendorf', license: 'CC BY 3.0 DE', url: 'https://opendata.deggendorf.de',
+    fetch: () => csvFeatures('https://opendata.deggendorf.de/od/containerstandorte.csv'),
+    map: (p) => containersFrom(p, 'Stadt Deggendorf'),
+  },
+  waldkraiburg: {
+    name: 'Stadt Waldkraiburg', license: 'CC BY 4.0', url: 'https://www.waldkraiburg.de',
+    fetch: () => csvFeatures('https://www.waldkraiburg.de/cdn/uploads/glascontainer-standorte-stadt-waldkraiburg.csv'),
+    map: (p) => containersFrom(p, 'Stadt Waldkraiburg', 'glas'),
+  },
+  wesel: {
+    name: 'Stadt Wesel', license: 'dl-de/zero-2.0', url: 'https://geoportal.wesel.de',
+    fetch: () => csvFeatures('https://geoportal.wesel.de/opendata/oeff_toiletten/oeff_toiletten.csv'),
+    map: (p) => ({ c: 'toilette', t: toilet({ name: p.name || p.Name || p.bezeichnung || p.Bezeichnung || p.standort || p.Standort, opening_hours: hoursDE(p.oeffnungszeiten || p.Oeffnungszeiten || p['Öffnungszeiten']) }) }),
+  },
+  soest: {
+    name: 'Stadt Soest', license: 'dl-de/by-2.0', url: 'https://opendata.soest.de',
+    fetch: () => csvFeatures('https://opendata.soest.de/dataset/e96b9f10-0684-4d1c-ba5f-43dcbef1c209/resource/767212a9-e383-4473-b6b4-7d85ee9eb30a/download/oeffentliche_toiletten_stadtsoest.csv'),
+    map: (p) => ({ c: 'toilette', t: toilet({ name: p.name || p.Name || p.bezeichnung || p.Bezeichnung || p.standort || p.Standort, opening_hours: hoursDE(p.oeffnungszeiten || p.Oeffnungszeiten || p['Öffnungszeiten']) }) }),
   },
   leipzig: {
     name: 'Stadt Leipzig', license: 'dl-de/by-2.0', url: 'https://opendata.leipzig.de',
