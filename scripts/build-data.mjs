@@ -112,7 +112,16 @@ if (!process.env.NO_EXTERNAL) {
     let added = 0;
     for (const it of ext[name] || []) {
       const r = it.c === 'paketshop' ? 60 : it.c === 'toilette' ? 60 : 40;
-      if (near(it, it.c, r) || (it.c === 'paketshop' && near(it, 'packstation', 25))) continue;
+      const o = near(it, it.c, r) || (it.c === 'paketshop' ? near(it, 'packstation', 25) : null);
+      if (o) {
+        // vorhandenen Eintrag mit amtlichen Zusatzinfos ergänzen (Öffnungszeiten, Gebühr, Barrierefreiheit …)
+        let enriched = false;
+        if (name !== 'overture') for (const k of ['opening_hours', 'fee', 'charge', 'wheelchair', 'changing_table', 'unisex']) {
+          if (it.t[k] && !o.t[k]) { o.t[k] = it.t[k]; enriched = true; }
+        }
+        if (enriched && !o.src2) { o.src2 = name; usedSources[`${name}_ergänzt`] = (usedSources[`${name}_ergänzt`] || 0) + 1; }
+        continue;
+      }
       kept.push(it); addGrid(it); added++;
     }
     if (ext[name]) usedSources[name] = added;
@@ -147,7 +156,7 @@ const index = {
   counts,
   tiles: tileCounts,
   overture: await readFile(new URL('work/overture_meta.json', root), 'utf8').then(JSON.parse).catch(() => null),
-  sources: Object.fromEntries(Object.entries(usedSources).map(([k, n]) => [k, { ...SOURCES[k], count: n }])),
+  sources: Object.fromEntries(Object.entries(usedSources).filter(([k]) => SOURCES[k]).map(([k, n]) => [k, { ...SOURCES[k], count: n, enriched: usedSources[`${k}_ergänzt`] || 0 }])),
 };
 await writeFile(new URL('index.json', dataDir), JSON.stringify(index));
 console.log(`OK: ${kept.length} Orte, ${places.length} Ortsnamen, ${tiles.size} Kacheln, ${(bytes / 1e6).toFixed(1)} MB`);
