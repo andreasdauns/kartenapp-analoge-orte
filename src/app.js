@@ -852,7 +852,7 @@ async function init() {
     state.index = await res.json();
     const extra = Object.entries(state.index.sources || {}).filter(([k]) => k !== 'osm')
       .map(([, v]) => `<a href="${v.url}" target="_blank" rel="noopener">${esc(v.name)}</a> (${esc(v.license)})`);
-    map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: extra.length ? 'Weitere Daten: ' + extra.join(', ') : undefined }), 'bottom-left');
+    map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '<a href="info.html">Über die App · Datenschutz</a>' + (extra.length ? ' · Weitere Daten: ' + extra.join(', ') : '') }), 'bottom-left');
     setTimeout(() => document.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show'), 1500);
     const g = new Date(state.index.generated);
     body.innerHTML = '<div class="empty">Orte werden geladen …</div>';

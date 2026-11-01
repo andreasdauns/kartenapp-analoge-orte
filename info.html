@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Around the Corner – Über die App</title>
+  <meta name="description" content="Around the Corner: kostenlose Karte für Briefkästen, Paketshops, Container, Toiletten, Geldautomaten und Ladesäulen in ganz Deutschland.">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <style>
+    :root { --bg:#EEF2EE; --card:#fff; --ink:#15201A; --muted:#5D6B63; --line:#DCE3DD; --accent:#173B2C; --accent2:#2F7A55; }
+    @media (prefers-color-scheme: dark) { :root { --bg:#101713; --card:#18221C; --ink:#E7EEE9; --muted:#9AA9A0; --line:#2A3830; --accent:#8FD3AE; --accent2:#8FD3AE; } }
+    * { box-sizing: border-box; }
+    body { margin:0; background:var(--bg); color:var(--ink); font: 16px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; }
+    main { max-width: 760px; margin: 0 auto; padding: 28px 16px 60px; }
+    header { display:flex; gap:14px; align-items:center; margin-bottom: 18px; }
+    header img { width:64px; height:64px; border-radius:16px; }
+    h1 { font-size: 28px; line-height:1.15; margin:0; letter-spacing:-.02em; }
+    .lead { color: var(--muted); margin: 4px 0 0; }
+    section { background:var(--card); border:1px solid var(--line); border-radius:16px; padding: 18px 20px; margin: 14px 0; }
+    h2 { font-size: 19px; margin: 0 0 8px; }
+    h3 { font-size: 16px; margin: 16px 0 4px; }
+    a { color: var(--accent2); }
+    .btn { display:inline-block; background:var(--accent); color:#fff; text-decoration:none; font-weight:650; padding: 12px 20px; border-radius: 12px; margin-top: 6px; }
+    @media (prefers-color-scheme: dark) { .btn { color:#10180F; } }
+    ul { padding-left: 20px; margin: 6px 0; }
+    table { width:100%; border-collapse: collapse; font-size: 14px; }
+    td, th { text-align:left; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
+    th { color: var(--muted); font-weight: 600; }
+    .small { font-size: 13px; color: var(--muted); }
+  </style>
+</head>
+<body>
+<main>
+  <header>
+    <img src="icons/icon.svg" alt="">
+    <div>
+      <h1>Around the Corner</h1>
+      <p class="lead">Alles, was du im Alltag um die Ecke suchst – auf einer Karte.</p>
+    </div>
+  </header>
+
+  <section>
+    <h2>Was ist das?</h2>
+    <p>Around the Corner zeigt dir in ganz Deutschland die nächsten <strong>Briefkästen</strong> (mit Leerungszeiten), <strong>Postfilialen, Paketshops und Paketstationen</strong> aller Anbieter, <strong>Glas-, Papier- und Altkleidercontainer</strong>, <strong>öffentliche Toiletten</strong>, <strong>Autobahn-Rastplätze</strong>, <strong>Geldautomaten</strong> und <strong>Ladesäulen</strong> – mit einem Tipp zur Route in Google Maps, Apple Karten oder Waze.</p>
+    <p>Die App ist <strong>kostenlos</strong> und funktioniert <strong>ohne Konto</strong>.</p>
+    <a class="btn" href="./">App öffnen</a>
+  </section>
+
+  <section>
+    <h2>Mitmachen</h2>
+    <p>Die App lebt vom Miteinander. Du kannst melden, wenn ein Container voll ist, eine Toilette geschlossen oder verschmutzt ist, sich Zeiten geändert haben oder ein Ort verschwunden ist – und neue Orte eintragen. Neue Orte gelten als bestätigt, sobald drei Personen sie bestätigt haben. Jede Meldung macht die Karte für alle genauer.</p>
+  </section>
+
+  <section>
+    <h2>Datenquellen</h2>
+    <p>Die Orte stammen aus offenen Datenquellen und werden täglich aktualisiert. Vielen Dank an alle, die diese Daten pflegen und bereitstellen.</p>
+    <table id="sources"><tr><th>Quelle</th><th>Lizenz</th><th>Orte</th></tr>
+      <tr><td><a href="https://www.openstreetmap.org/copyright">OpenStreetMap-Mitwirkende</a></td><td>ODbL</td><td>–</td></tr>
+    </table>
+    <p class="small">Kartendarstellung: <a href="https://openfreemap.org">OpenFreeMap</a>, © OpenMapTiles, Daten © OpenStreetMap-Mitwirkende. Geändert: Daten wurden gefiltert, zusammengeführt und für die Kartenanzeige aufbereitet.</p>
+  </section>
+
+  <section id="datenschutz">
+    <h2>Datenschutz</h2>
+    <p>Kurz gesagt: <strong>Kein Konto, keine Werbe-Tracker, keine Cookies.</strong> Im Einzelnen:</p>
+    <h3>Hosting</h3>
+    <p>Die App wird über GitHub Pages (GitHub Inc., USA) ausgeliefert. Dabei verarbeitet GitHub technisch notwendig deine IP-Adresse, um die Seite zu übertragen.</p>
+    <h3>Kartenkacheln</h3>
+    <p>Die Hintergrundkarte wird von OpenFreeMap geladen. Dabei wird deine IP-Adresse an diesen Dienst übertragen.</p>
+    <h3>Standort</h3>
+    <p>Wenn du die Standortfreigabe erlaubst, wird dein Standort <strong>nur auf deinem Gerät</strong> verwendet, um die nächsten Orte zu sortieren. Er wird nicht an uns übertragen oder gespeichert.</p>
+    <h3>Meldungen</h3>
+    <p>Wenn du etwas meldest oder einen Ort einträgst, speichern wir die Meldung (Art, Text, Ort auf der Karte, Zeitpunkt) sowie eine zufällig erzeugte Geräte-Kennung, die keinen Rückschluss auf deine Person erlaubt. Sie dient nur dazu, Mehrfachbestätigungen und Spam zu verhindern. Die Daten liegen bei Supabase in einem Rechenzentrum in Frankfurt am Main und sind für alle Nutzer der App sichtbar. Schreibe bitte keine persönlichen Daten in Meldungen.</p>
+    <h3>Einstellungen</h3>
+    <p>Deine Auswahl (z. B. Kategorien, Navi-App) wird nur lokal in deinem Browser gespeichert.</p>
+    <h3>Navigation</h3>
+    <p>Beim Tippen auf „Route“ öffnet sich Google Maps, Apple Karten oder Waze. Ab dann gelten deren Datenschutzbestimmungen.</p>
+  </section>
+
+  <section id="kontakt">
+    <h2>Kontakt</h2>
+    <p>Fragen, Hinweise zu Daten oder Kooperationen: <a id="mail" href="#kontakt">E-Mail anzeigen</a></p>
+    <p class="small">Around the Corner ist ein privates, nicht-kommerzielles Projekt von Andreas Dauns.</p>
+  </section>
+</main>
+<script>
+  // E-Mail-Adresse erst beim Klick zusammensetzen (Schutz vor Spam-Bots)
+  document.getElementById('mail').addEventListener('click', (e) => {
+    const a = e.currentTarget, m = ['andreas.dauns', 'gmail.com'].join('@');
+    a.href = 'mailto:' + m + '?subject=Around%20the%20Corner'; a.textContent = m;
+  });
+  fetch('data/index.json').then((r) => r.json()).then((d) => {
+    const rows = Object.values(d.sources || {}).sort((a, b) => (b.count || 0) - (a.count || 0));
+    const t = document.getElementById('sources');
+    t.innerHTML = '<tr><th>Quelle</th><th>Lizenz</th><th>Orte</th></tr>' + rows.map((s) =>
+      `<tr><td><a href="${s.url}">${s.name}</a></td><td>${s.license}</td><td>${(s.count || 0).toLocaleString('de-DE')}${s.enriched ? ` (+${s.enriched} ergänzt)` : ''}</td></tr>`).join('');
+  }).catch(() => {});
+</script>
+</body>
+</html>

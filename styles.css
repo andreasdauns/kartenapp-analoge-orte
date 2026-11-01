@@ -172,3 +172,4 @@ body.dragging .fabs, body.dragging .maplibregl-ctrl-bottom-left { transition: no
 .welcome-logo { width: 56px; height: 56px; border-radius: 14px; }
 .welcome p { color: var(--ink); font-size: 14.5px; line-height: 1.45; margin: 0; }
 .welcome-tips { margin: 2px 0 6px; padding-left: 18px; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
+.welcome-more { text-align: center; font-size: 13px; color: var(--muted); padding: 4px; }
