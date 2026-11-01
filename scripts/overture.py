@@ -15,15 +15,23 @@ meta = {"release": None, "columns": [], "error": None, "by_category": {}, "by_so
 
 
 def latest_release():
+    """Neuestes Release aus der S3-Verzeichnisliste (alternativ STAC-Katalog)."""
     try:
-        with urllib.request.urlopen("https://labs.overturemaps.org/data/releases.json", timeout=60) as r:
-            d = json.load(r)
-        rel = d.get("latest") or (d.get("releases") or [None])[0]
-        if isinstance(rel, dict):
-            rel = rel.get("release") or rel.get("version") or rel.get("name")
-        return rel
+        url = "https://overturemaps-us-west-2.s3.us-west-2.amazonaws.com/?list-type=2&prefix=release/&delimiter=/"
+        with urllib.request.urlopen(url, timeout=60) as r:
+            xml = r.read().decode()
+        rels = sorted(re.findall(r"<Prefix>release/([^/<]+)/</Prefix>", xml))
+        if rels:
+            return rels[-1]
     except Exception as e:  # noqa: BLE001
-        meta["error"] = f"releases.json: {e}"
+        meta["error"] = f"S3-Liste: {e}"
+    try:
+        with urllib.request.urlopen("https://stac.overturemaps.org/catalog.json", timeout=60) as r:
+            d = json.load(r)
+        rels = sorted(l["href"].split("/")[-2] for l in d.get("links", []) if l.get("rel") == "child")
+        return rels[-1] if rels else None
+    except Exception as e:  # noqa: BLE001
+        meta["error"] = (meta["error"] or "") + f" STAC: {e}"
         return None
 
 
