@@ -28,6 +28,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - name: Melde-Datenbank wach halten
+        continue-on-error: true
+        run: |
+          URL=$(grep -o "https://[a-z0-9]*\.supabase\.co" src/config.js || true)
+          KEY=$(grep -o "eyJ[A-Za-z0-9._-]*" src/config.js || true)
+          [ -n "$URL" ] && curl -s -o /dev/null -w "Supabase: %{http_code}\n" "$URL/rest/v1/reports?select=id&limit=1" -H "apikey: $KEY" || true
       - name: Werkzeug installieren
         run: sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
       - name: OpenStreetMap-Daten laden und filtern
