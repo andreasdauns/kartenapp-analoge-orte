@@ -1,5 +1,6 @@
 import { CATEGORIES, CATEGORY_BY_ID, PROVIDERS } from './categories.js';
 import { parseHours, nextPoint, openState, weekSummary } from './hours.js';
+import * as R from './reports.js';
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
 const LIST_LIMIT = 25;
@@ -303,7 +304,7 @@ function markerImage(cat) {
 
 const fc = (features) => ({ type: 'FeatureCollection', features });
 const pointF = (lon, lat, props = {}) => ({ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: [lon, lat] } });
-const geojson = () => fc(state.items.map((it, i) => pointF(it.lon, it.lat, { c: it.c, i, pv: it.pv ? `|${it.pv.join('|')}|` : '' })));
+const geojson = () => fc(state.items.map((it, i) => pointF(it.lon, it.lat, { c: it.c, i, pv: it.pv ? `|${it.pv.join('|')}|` : '', u: it.src === 'user' && !isConfirmed(it) ? 1 : 0 })));
 
 function applyFilter() {
   if (!map.getLayer('pois')) return;
@@ -333,6 +334,7 @@ async function setupLayers() {
       'icon-allow-overlap': true,
       'icon-ignore-placement': true,
     },
+    paint: { 'icon-opacity': ['case', ['==', ['get', 'u'], 1], 0.5, 1] },
   });
   applyFilter();
 }
@@ -343,7 +345,7 @@ map.on('click', 'pois', (e) => {
   e.originalEvent.__handled = true;
   openDetail(state.items[f.properties.i]);
 });
-map.on('click', (e) => { if (!e.originalEvent.__handled && state.selected) closeDetail(); });
+map.on('click', (e) => { if (!e.originalEvent.__handled && state.selected && !state.selected.adding) closeDetail(); });
 map.on('mouseenter', 'pois', () => { map.getCanvas().style.cursor = 'pointer'; });
 map.on('mouseleave', 'pois', () => { map.getCanvas().style.cursor = ''; });
 let moveTimer;
@@ -353,6 +355,7 @@ map.on('moveend', () => {
     const c = map.getCenter();
     store.set('view', { lat: c.lat, lon: c.lng, zoom: map.getZoom() });
     loadVisible();
+    loadReports();
     updateHeader();
     if (!state.me && !state.selected) renderList();
   }, 200);
@@ -471,6 +474,7 @@ function layoutSheet() {
   const pad = { top: Math.round($('.top').offsetHeight + 8), bottom: Math.round(wide() ? 0 : Math.min(h, innerHeight * 0.5)), left: wide() ? 420 : 0, right: 0 };
   const cur = map.getPadding();
   if (cur.top !== pad.top || cur.bottom !== pad.bottom || cur.left !== pad.left) map.setPadding(pad);
+  document.documentElement.style.setProperty('--cross-y', `${Math.round(pad.top + (innerHeight - pad.top - pad.bottom) / 2)}px`);
 }
 addEventListener('resize', layoutSheet);
 
@@ -532,7 +536,7 @@ function message(msg) {
 
 function rowHtml(it, ref) {
   const cat = CATEGORY_BY_ID[it.c];
-  const st = statusOf(it);
+  const st = reportChips(it)[0] || statusOf(it);
   const sub = subOf(it);
   return `<div class="row" data-i="${it._i}" role="button" tabindex="0">
     <span class="ic" style="--c:${cat.color};--k:${cat.ink}">${cat.icon}</span>
@@ -580,10 +584,11 @@ body.addEventListener('click', (e) => {
 });
 
 function openDetail(it, fly = false) {
+  $('#crosshair').hidden = true;
   state.selected = it;
   it._i = state.items.indexOf(it);
   const cat = CATEGORY_BY_ID[it.c];
-  const chips = [statusOf(it), ...extraChips(it)].filter(Boolean);
+  const chips = [...reportChips(it), statusOf(it), ...extraChips(it)].filter(Boolean);
   const ref = refPoint();
   const sub = subOf(it);
   map.getSource('sel')?.setData(fc([pointF(it.lon, it.lat)]));
@@ -596,16 +601,21 @@ function openDetail(it, fly = false) {
       <button class="close" id="close" aria-label="Schließen">${ICON_X}</button>
     </div>
     ${chips.length ? `<div class="status-line">${chips.map((c) => `<span class="st ${c.cls}">${esc(c.text)}</span>`).join('')}</div>` : ''}
-    <dl class="facts">${factsOf(it).map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+    <dl class="facts">${[...factsOf(it), ...reportFacts(it)].map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
     <div class="actions">
       <a class="btn primary" data-route="${it._i}" href="${routeUrl(it)}" target="_blank" rel="noopener">${ICON_ROUTE}Route</a>
-      ${!it.src ? `<a class="btn" href="${noteUrl(it)}" target="_blank" rel="noopener">${ICON_FLAG}Korrigieren</a>` : ''}
+      ${R.enabled() ? (it.src === 'user' && !isConfirmed(it)
+        ? `<button class="btn" id="confirm">Gibt es (${confirmCount(it)}/${R.CONFIRM_NEEDED})</button>`
+        : `<button class="btn" id="report-btn">${ICON_FLAG}Melden</button>`)
+        : (!it.src ? `<a class="btn" href="${noteUrl(it)}" target="_blank" rel="noopener">${ICON_FLAG}Korrigieren</a>` : '')}
     </div>
     ${state.nav ? `<div class="navpref">Navigation mit ${esc(NAV[state.nav].name)} · <button id="navchange">ändern</button></div>` : ''}
     <div class="src">${sourceLine(it, checked)}</div>
   </div>`;
   $('#close').addEventListener('click', closeDetail);
   $('#navchange')?.addEventListener('click', () => openChooser(null));
+  $('#report-btn')?.addEventListener('click', () => openReport(it));
+  $('#confirm')?.addEventListener('click', () => submit({ place_id: it.id, category: it.c, kind: 'confirm', lat: it.lat, lon: it.lon }, 'Danke für die Bestätigung!'));
   layoutSheet();
   if (fly) map.easeTo({ center: [it.lon, it.lat], zoom: Math.max(map.getZoom(), 16) });
 }
@@ -613,10 +623,12 @@ function sourceLine(it, checked) {
   const S = state.index?.sources || {};
   const parts = [];
   if (!it.src) parts.push(`<a href="https://www.openstreetmap.org/${{ n: 'node', w: 'way', r: 'relation' }[it.id[0]]}/${it.id.slice(1)}" target="_blank" rel="noopener">OpenStreetMap</a>`);
+  if (it.src === 'user') parts.push(`von Nutzern gemeldet · ${isConfirmed(it) ? 'bestätigt' : `noch nicht bestätigt (${confirmCount(it)}/${R.CONFIRM_NEEDED})`}`);
   for (const k of [it.src, it.src2].filter(Boolean)) if (S[k]) parts.push(`<a href="${S[k].url}" target="_blank" rel="noopener">${esc(S[k].name)}</a> (${esc(S[k].license)})`);
   return `Quelle: ${parts.join(' · ')}${checked ? ` · vor Ort geprüft ${esc(fmtDate(checked))}` : ''}`;
 }
 function closeDetail() {
+  $('#crosshair').hidden = true;
   state.selected = null;
   state.mode = 'peek';
   map.getSource('sel')?.setData(fc([]));
@@ -648,8 +660,177 @@ $('#chooser').addEventListener('click', (e) => {
     if (!window.open(url, '_blank')) location.href = url;
   }
   pendingRoute = null;
+  if (state.selected?.adding) return;
   if (state.selected) openDetail(state.selected); else renderList();
 });
+
+// ---------- Meldungen ----------
+state.rep = new Map();
+state.repRows = new Map();
+state.repFetched = new Map();
+const repOf = (it) => state.rep.get(it.id);
+const confirmCount = (it) => repOf(it)?.confirm.size || 1;
+const isConfirmed = (it) => it.src !== 'user' || confirmCount(it) >= R.CONFIRM_NEEDED;
+const STATUS_TEXT = { voll: ['bad', 'Voll'], halb: ['warn', 'Halb voll'], leer: ['ok', 'Platz frei'], sauber: ['ok', 'Sauber'], ok: ['ok', 'In Ordnung'], dreckig: ['bad', 'Dreckig'], defekt: ['bad', 'Defekt'] };
+
+function reportChips(it) {
+  const r = repOf(it);
+  if (!r) return [];
+  const out = [];
+  if (r.status) { const [cls, label] = STATUS_TEXT[r.status.value] || ['', r.status.value]; out.push({ cls, text: `${label} · ${R.ago(r.status.at)}` }); }
+  if (r.closed) out.push({ cls: 'bad', text: `Geschlossen gemeldet · ${R.ago(r.closed.at)}` });
+  if (r.gone.size) out.push({ cls: r.gone.size >= 2 ? 'bad' : 'warn', text: `${r.gone.size}× als verschwunden gemeldet` });
+  if (r.hours) out.push({ cls: 'warn', text: 'Zeiten geändert (Meldung)' });
+  return out;
+}
+function reportFacts(it) {
+  const r = repOf(it);
+  if (!r) return [];
+  const f = [];
+  if (r.hours) f.push(['Neue Zeiten (Meldung)', `${r.hours.text} · ${R.ago(r.hours.at)}`]);
+  if (r.closed?.text) f.push(['Geschlossen', r.closed.text]);
+  for (const n of r.notes) f.push(['Hinweis', `${n.text} · ${R.ago(n.at)}`]);
+  return f;
+}
+
+function applyReports() {
+  const all = [];
+  for (const rows of state.repRows.values()) all.push(...rows);
+  all.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+  state.rep = R.summarize(all);
+  let added = false;
+  for (const [id, r] of state.rep) {
+    if (!r.newPlace || state.items.some((it) => it.id === id)) continue;
+    const n = r.newPlace;
+    state.items.push({ id, c: n.category, lat: n.lat, lon: n.lon, t: n.message ? { name: n.message } : {}, src: 'user' });
+    added = true;
+  }
+  if (added || all.length) map.getSource('pois')?.setData(geojson());
+  if (state.selected?.adding) return;
+  if (state.selected) openDetail(state.selected); else renderList();
+}
+
+async function loadReports(force = false) {
+  if (!R.enabled() || map.getZoom() < 11) return;
+  const b = map.getBounds();
+  const key = `${b.getSouth().toFixed(1)}_${b.getWest().toFixed(1)}_${b.getNorth().toFixed(1)}_${b.getEast().toFixed(1)}`;
+  if (!force && Date.now() - (state.repFetched.get(key) || 0) < 5 * 60000) return;
+  state.repFetched.set(key, Date.now());
+  try {
+    const rows = await R.fetchBox(b.getSouth() - 0.02, b.getWest() - 0.03, b.getNorth() + 0.02, b.getEast() + 0.03);
+    for (const r of rows) {
+      if (!state.repRows.has(r.place_id)) state.repRows.set(r.place_id, []);
+      const list = state.repRows.get(r.place_id);
+      if (!list.some((x) => x.created_at === r.created_at && x.device === r.device && x.kind === r.kind)) list.push(r);
+    }
+    applyReports();
+  } catch { /* offline o. ä. */ }
+}
+
+let toastTimer;
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg; t.hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 3200);
+}
+
+async function submit(report, thanks = 'Danke! Deine Meldung ist gespeichert.') {
+  try {
+    await R.send(report);
+    $('#report').hidden = true;
+    toast(thanks);
+    const row = { ...report, device: R.deviceId(), created_at: new Date().toISOString(), expires_at: null };
+    if (report.kind === 'status' && R.STATUS_TTL[report.category]) row.expires_at = new Date(Date.now() + R.STATUS_TTL[report.category]).toISOString();
+    if (!state.repRows.has(report.place_id)) state.repRows.set(report.place_id, []);
+    state.repRows.get(report.place_id).push(row);
+    applyReports();
+  } catch (e) {
+    toast(e.message);
+  }
+}
+
+function openReport(it) {
+  const grp = R.statusGroup(it.c);
+  const base = { place_id: it.id, category: it.c, lat: it.lat, lon: it.lon };
+  const timesLabel = it.c === 'briefkasten' ? 'Leerungszeit geändert' : isContainer(it.c) ? 'Einwurfzeiten geändert' : 'Öffnungszeiten geändert';
+  $('#report-card').innerHTML = `
+    <h2>${esc(titleOf(it))} melden</h2>
+    ${grp ? `<div class="sec">Wie sieht es gerade aus?</div><div class="opts">${R.STATUS_OPTIONS[grp].map(([v, l]) => `<button class="btn" data-status="${v}">${esc(l)}</button>`).join('')}</div>` : ''}
+    <div class="sec">Etwas stimmt nicht</div>
+    <div class="opts">
+      <button class="btn" data-kind="hours">${esc(timesLabel)}</button>
+      <button class="btn" data-kind="closed">Vorübergehend geschlossen</button>
+      <button class="btn" data-kind="gone">Gibt es nicht mehr</button>
+      <button class="btn" data-kind="note">Sonstiger Hinweis</button>
+    </div>
+    <div id="report-text" hidden>
+      <textarea id="report-msg" rows="3" maxlength="300"></textarea>
+      <button class="btn primary small" id="report-send" style="width:100%;margin-top:8px">Senden</button>
+    </div>
+    <button class="link" data-close>Abbrechen</button>`;
+  const card = $('#report-card');
+  let kind = null;
+  card.onclick = (e) => {
+    const b = e.target.closest('button');
+    if (!b) return;
+    if (b.dataset.close !== undefined) { $('#report').hidden = true; return; }
+    if (b.dataset.status) return submit({ ...base, kind: 'status', status: b.dataset.status });
+    if (b.dataset.kind === 'gone') return submit({ ...base, kind: 'gone' });
+    if (b.dataset.kind) {
+      kind = b.dataset.kind;
+      $('#report-text').hidden = false;
+      $('#report-msg').placeholder = { hours: it.c === 'briefkasten' ? 'z. B. Mo–Fr 16:00, Sa 11:00' : 'z. B. Mo–Sa 7–20 Uhr', closed: 'z. B. Baustelle bis Ende November (optional)', note: 'Was sollten andere wissen?' }[kind];
+      $('#report-msg').focus();
+      return;
+    }
+    if (b.id === 'report-send') {
+      const msg = $('#report-msg').value.trim();
+      if (kind !== 'closed' && !msg) { $('#report-msg').focus(); return; }
+      submit({ ...base, kind, message: msg || null });
+    }
+  };
+  $('#report').hidden = false;
+}
+$('#report').addEventListener('click', (e) => { if (e.target === $('#report')) $('#report').hidden = true; });
+
+// Neuen Ort eintragen: Fadenkreuz in der Kartenmitte
+function openAdd() {
+  closeDetail();
+  $('#crosshair').hidden = false;
+  let cat = null;
+  body.innerHTML = `<div class="detail">
+    <div class="detail-h"><div><div class="cat">Neuen Ort melden</div><h2>Karte verschieben, bis das Kreuz auf dem Ort liegt</h2></div>
+      <button class="close" id="add-cancel" aria-label="Abbrechen">${ICON_X}</button></div>
+    <div class="sec" style="font-size:12px;font-weight:700;color:var(--muted);margin:4px 0 6px">WAS IST DORT?</div>
+    <div class="cat-pick">${CATEGORIES.map((c) => `<button class="chip" data-cat="${c.id}" aria-pressed="false" style="--c:${c.color};--k:${c.ink}"><span class="ic">${c.icon}</span>${esc(c.label)}</button>`).join('')}</div>
+    <input type="text" id="add-name" maxlength="120" placeholder="Name oder Hinweis (optional)" style="width:100%;margin:10px 0;font:inherit;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">
+    <button class="btn primary" id="add-save" style="width:100%">Ort melden</button>
+    <div class="src">Der Ort erscheint sofort blass auf der Karte und gilt als bestätigt, sobald ${R.CONFIRM_NEEDED} Personen ihn bestätigt haben.</div>
+  </div>`;
+  state.selected = { adding: true };
+  body.querySelectorAll('[data-cat]').forEach((b) => b.addEventListener('click', () => {
+    cat = b.dataset.cat;
+    body.querySelectorAll('[data-cat]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+  }));
+  const end = () => { $('#crosshair').hidden = true; state.selected = null; renderList(); };
+  $('#add-cancel').addEventListener('click', end);
+  $('#add-save').addEventListener('click', async () => {
+    if (!cat) { toast('Bitte zuerst auswählen, was dort ist.'); return; }
+    const c = map.getCenter();
+    const id = `new:${(crypto.randomUUID?.() || String(Date.now())).replace(/-/g, '').slice(0, 20)}`;
+    const msg = $('#add-name').value.trim();
+    $('#crosshair').hidden = true;
+    state.selected = null;
+    await submit({ place_id: id, category: cat, kind: 'new', lat: +c.lat.toFixed(6), lon: +c.lng.toFixed(6), message: msg || null }, 'Danke! Der Ort ist eingetragen und wartet auf Bestätigung.');
+    state.active.add(cat);
+    renderChips(); applyFilter();
+  });
+  layoutSheet();
+}
+if (R.enabled()) {
+  $('#btn-add').hidden = false;
+  $('#btn-add').addEventListener('click', openAdd);
+}
 
 // ---------- Start ----------
 async function init() {

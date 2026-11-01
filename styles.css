@@ -135,3 +135,19 @@ body.dragging .fabs, body.dragging .maplibregl-ctrl-bottom-left { transition: no
 .chip.pv[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: transparent; }
 @media (prefers-color-scheme: dark) { .chip.pv[aria-pressed="true"] { color: #10180F; } }
 .hint a { color: var(--accent-2); font-weight: 600; }
+
+/* Meldungen */
+.crosshair { position: fixed; left: 50%; top: var(--cross-y, 40vh); width: 44px; height: 44px; margin: -22px 0 0 -22px; z-index: 3; pointer-events: none; }
+.crosshair::before, .crosshair::after { content: ""; position: absolute; background: var(--accent); }
+.crosshair::before { left: 21px; top: 0; width: 2px; height: 44px; }
+.crosshair::after { top: 21px; left: 0; height: 2px; width: 44px; }
+.crosshair[hidden] { display: none; }
+.toast { position: fixed; left: 50%; top: calc(var(--safe-top) + 130px); transform: translateX(-50%); z-index: 30; background: var(--accent); color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 14px; font-weight: 600; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
+.toast[hidden] { display: none; }
+.opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
+.opts .btn { flex: none; min-height: 46px; height: auto; padding: 8px 10px; font-size: 14px; white-space: normal; line-height: 1.2; text-align: center; }
+.chooser-card textarea, .chooser-card input[type=text] { width: 100%; font: inherit; font-size: 15px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line); background: var(--bg); color: var(--ink); resize: vertical; }
+.chooser-card .sec { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; margin-top: 6px; }
+.cat-pick { display: flex; flex-wrap: wrap; gap: 6px; }
+.cat-pick .chip { height: 34px; font-size: 13px; }
+.btn.small { height: 40px; font-size: 14px; }
