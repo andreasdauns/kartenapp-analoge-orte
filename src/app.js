@@ -444,7 +444,8 @@ function peekHeight() {
   if (state.selected) {
     const c = body.firstElementChild;
     const safe = parseFloat(getComputedStyle(body).paddingBottom) || 12;
-    return Math.min(sheetMax(), Math.round($('#grip').offsetHeight + (c ? c.getBoundingClientRect().height : 120) + safe + 4));
+    const max = state.selected.adding ? Math.round(innerHeight * 0.42) : sheetMax(); // beim Eintragen max. knapp halber Bildschirm
+    return Math.min(max, Math.round($('#grip').offsetHeight + (c ? c.getBoundingClientRect().height : 120) + safe + 4));
   }
   const rows = body.querySelectorAll('.row');
   const last = rows[Math.min(PEEK_ROWS, rows.length) - 1] || body.lastElementChild;
@@ -470,7 +471,7 @@ addEventListener('resize', layoutSheet);
 
 let drag = null, suppressClick = false;
 sheet.addEventListener('pointerdown', (e) => {
-  if (wide()) return;
+  if (wide() || state.selected?.adding) return; // beim Eintragen nicht ziehen, damit das Formular nicht verschwindet
   const handle = e.target.closest('.grip, .sheet-h, .detail-h');
   const peekAnywhere = state.mode === 'peek' && !e.target.closest('a, button, .go');
   if (!handle && !peekAnywhere) return;
@@ -794,13 +795,12 @@ function openAdd() {
   $('#crosshair').hidden = false;
   let cat = null;
   body.innerHTML = `<div class="detail">
-    <div class="detail-h"><div><div class="cat">Neuen Ort melden</div><h2>Karte verschieben, bis das Kreuz auf dem Ort liegt</h2></div>
+    <div class="detail-h add-h"><div><div class="cat">Neuen Ort melden</div><h2>Kreuz auf den Ort schieben</h2></div>
       <button class="close" id="add-cancel" aria-label="Abbrechen">${ICON_X}</button></div>
-    <div class="sec" style="font-size:12px;font-weight:700;color:var(--muted);margin:4px 0 6px">WAS IST DORT?</div>
+    <div class="add-sec">Was ist dort?</div>
     <div class="cat-pick">${CATEGORIES.map((c) => `<button class="chip" data-cat="${c.id}" aria-pressed="false" style="--c:${c.color};--k:${c.ink}"><span class="ic">${c.icon}</span>${esc(c.label)}</button>`).join('')}</div>
-    <input type="text" id="add-name" maxlength="120" placeholder="Name oder Hinweis (optional)" style="width:100%;margin:10px 0;font:inherit;padding:10px 12px;border-radius:12px;border:1px solid var(--line);background:var(--bg);color:var(--ink)">
-    <button class="btn primary" id="add-save" style="width:100%">Ort melden</button>
-    <div class="src">Der Ort erscheint sofort blass auf der Karte und gilt als bestätigt, sobald ${R.CONFIRM_NEEDED} Personen ihn bestätigt haben.</div>
+    <div class="add-row"><input type="text" id="add-name" maxlength="120" placeholder="Name oder Hinweis (optional)"><button class="btn primary" id="add-save">Melden</button></div>
+    <div class="src">Erscheint sofort blass und gilt als bestätigt, sobald ${R.CONFIRM_NEEDED} Personen ihn bestätigt haben.</div>
   </div>`;
   state.selected = { adding: true };
   body.querySelectorAll('[data-cat]').forEach((b) => b.addEventListener('click', () => {
