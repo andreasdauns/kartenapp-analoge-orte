@@ -74,7 +74,7 @@ const kept = items.filter((it) => !(it.c === 'geldautomat' && it.t.amenity === '
 // ---------- Zusätzliche Quellen einmischen ----------
 const usedSources = { osm: kept.length };
 if (!process.env.NO_EXTERNAL) {
-  const ext = await loadExternal(config.regions.map((r) => r.name));
+  const ext = await loadExternal(config.states || config.regions.map((r) => r.name));
   const G = 0.005;
   const gk = (la, lo) => `${Math.floor(la / G)}_${Math.floor(lo / G)}`;
   const grid = new Map();

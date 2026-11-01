@@ -142,7 +142,7 @@ async function autobahn(stateCodes) {
     catch { continue; }
     for (const p of d.parking_lorry || []) {
       const m = /^DE-([A-Z]{2,3})-/.exec(p.identifier || '');
-      if (!m || !stateCodes.includes(m[1]) || seen.has(p.identifier)) continue;
+      if (!m || !(stateCodes.includes('*') || stateCodes.includes(m[1])) || seen.has(p.identifier)) continue;
       seen.add(p.identifier);
       const feats = (p.lorryParkingFeatureIcons || []).map((f) => f.description).filter(Boolean);
       const t = {
@@ -216,10 +216,10 @@ async function koeln() {
 
 const STATE_CODES = { 'Nordrhein-Westfalen': ['NW', 'NRW'], Hessen: ['HE'], 'Rheinland-Pfalz': ['RP'] };
 
-export async function loadExternal(regionNames) {
+export async function loadExternal(states) {
   const jobs = {
-    bnetza: () => bnetza(regionNames),
-    autobahn: () => autobahn(regionNames.flatMap((n) => STATE_CODES[n] || [])),
+    bnetza: () => bnetza(states),
+    autobahn: () => autobahn(states.length >= 16 ? ['*'] : states.flatMap((n) => STATE_CODES[n] || [])),
     dortmund, muenster, koeln,
   };
   const result = {};

@@ -1,9 +1,8 @@
 {
   "regions": [
-    { "name": "Nordrhein-Westfalen", "url": "https://download.geofabrik.de/europe/germany/nordrhein-westfalen-latest.osm.pbf" },
-    { "name": "Hessen", "url": "https://download.geofabrik.de/europe/germany/hessen-latest.osm.pbf" },
-    { "name": "Rheinland-Pfalz", "url": "https://download.geofabrik.de/europe/germany/rheinland-pfalz-latest.osm.pbf" }
+    { "name": "Deutschland", "url": "https://download.geofabrik.de/europe/germany-latest.osm.pbf" }
   ],
+  "states": ["Baden-Württemberg", "Bayern", "Berlin", "Brandenburg", "Bremen", "Hamburg", "Hessen", "Mecklenburg-Vorpommern", "Niedersachsen", "Nordrhein-Westfalen", "Rheinland-Pfalz", "Saarland", "Sachsen", "Sachsen-Anhalt", "Schleswig-Holstein", "Thüringen"],
   "tileDeg": 0.25,
   "start": { "name": "Bad Neuenahr-Ahrweiler", "lat": 50.5446, "lon": 7.1136 }
 }

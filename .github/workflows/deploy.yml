@@ -19,7 +19,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 120
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -33,7 +33,7 @@ jobs:
       - name: OpenStreetMap-Daten laden und filtern
         run: bash scripts/fetch-osm.sh
       - name: Kacheln für die App bauen
-        run: node scripts/build-data.mjs work/all.geojsonseq
+        run: node --max-old-space-size=6144 scripts/build-data.mjs work/all.geojsonseq
       - name: Arbeitsdateien entfernen
         run: rm -rf work node_modules
       - uses: actions/configure-pages@v5
