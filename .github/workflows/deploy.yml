@@ -38,6 +38,9 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
       - name: OpenStreetMap-Daten laden und filtern
         run: bash scripts/fetch-osm.sh
+      - name: Overture Maps laden
+        continue-on-error: true
+        run: python3 -m pip install -q --break-system-packages duckdb==2.0.0 && python3 scripts/overture.py
       - name: Kacheln für die App bauen
         run: node --max-old-space-size=6144 scripts/build-data.mjs work/all.geojsonseq
       - name: Arbeitsdateien entfernen

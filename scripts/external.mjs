@@ -16,6 +16,7 @@ export const SOURCES = {
   autobahn: { name: 'Die Autobahn GmbH des Bundes', license: 'verkehr.autobahn.de', url: 'https://www.autobahn.de' },
   dortmund: { name: 'EDG Entsorgung Dortmund', license: 'dl-de/zero-2.0', url: 'https://open-data.dortmund.de/explore/dataset/edg-abfallentsorgung/' },
   muenster: { name: 'Stadt Münster', license: 'dl-de/by-2.0', url: 'https://opendata.stadt-muenster.de/dataset/standorte-der-glascontainer' },
+  overture: { name: 'Overture Maps Foundation', license: 'CDLA-Permissive-2.0 / Apache-2.0', url: 'https://docs.overturemaps.org/attribution/' },
   koeln: { name: 'Stadt Köln', license: 'dl-de/zero-2.0', url: 'https://www.offenedaten-koeln.de/' },
 };
 
@@ -214,13 +215,33 @@ async function koeln() {
   return out;
 }
 
+// ---------- Overture Maps (vorher von scripts/overture.py nach work/overture.json geschrieben) ----------
+import { readFile as rf } from 'node:fs/promises';
+import { parcelInfo } from '../src/categories.js';
+async function overture() {
+  const rows = JSON.parse(await rf(new URL('../work/overture.json', import.meta.url), 'utf8'));
+  return rows.map((r) => {
+    const t = {
+      name: r.name || undefined, brand: r.brand || undefined,
+      'addr:street': r.street || undefined, 'addr:city': r.city || undefined,
+      amenity: { geldautomat: 'atm', toilette: 'toilets', packstation: 'parcel_locker', paketshop: /post_office/.test(r.cat || '') ? 'post_office' : undefined }[r.c],
+    };
+    const it = { id: `o${r.id}`, c: r.c, lat: r.lat, lon: r.lon, t, src: 'overture' };
+    if (r.c === 'paketshop' || r.c === 'packstation') {
+      const p = parcelInfo(Object.fromEntries(Object.entries(t).filter(([, v]) => v)));
+      it.pk = p.kind; it.pv = p.pv; it.ps = p.send;
+    }
+    return it;
+  });
+}
+
 const STATE_CODES = { 'Nordrhein-Westfalen': ['NW', 'NRW'], Hessen: ['HE'], 'Rheinland-Pfalz': ['RP'] };
 
 export async function loadExternal(states) {
   const jobs = {
     bnetza: () => bnetza(states),
     autobahn: () => autobahn(states.length >= 16 ? ['*'] : states.flatMap((n) => STATE_CODES[n] || [])),
-    dortmund, muenster, koeln,
+    dortmund, muenster, koeln, overture,
   };
   const result = {};
   for (const [name, fn] of Object.entries(jobs)) {

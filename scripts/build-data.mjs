@@ -105,10 +105,11 @@ if (!process.env.NO_EXTERNAL) {
     } else { kept.push(it); addGrid(it); }
   }
   if (ext.autobahn) usedSources.autobahn = ext.autobahn.length;
-  for (const name of ['dortmund', 'muenster', 'koeln']) {
+  for (const name of ['dortmund', 'muenster', 'koeln', 'overture']) {
     let added = 0;
     for (const it of ext[name] || []) {
-      if (near(it, it.c, it.c === 'toilette' ? 60 : 40)) continue;
+      const r = it.c === 'paketshop' ? 60 : it.c === 'toilette' ? 60 : 40;
+      if (near(it, it.c, r) || (it.c === 'paketshop' && near(it, 'packstation', 25))) continue;
       kept.push(it); addGrid(it); added++;
     }
     if (ext[name]) usedSources[name] = added;
@@ -142,6 +143,7 @@ const index = {
   start: config.start,
   counts,
   tiles: tileCounts,
+  overture: await readFile(new URL('work/overture_meta.json', root), 'utf8').then(JSON.parse).catch(() => null),
   sources: Object.fromEntries(Object.entries(usedSources).map(([k, n]) => [k, { ...SOURCES[k], count: n }])),
 };
 await writeFile(new URL('index.json', dataDir), JSON.stringify(index));
