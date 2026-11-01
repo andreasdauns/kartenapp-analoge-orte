@@ -8,6 +8,8 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import readline from 'node:readline';
 import { classify, KEEP_TAG, parcelInfo } from '../src/categories.js';
 import { loadExternal, SOURCES } from './external.mjs';
+import { loadCities, CITY_SOURCES } from './cities.mjs';
+for (const [k, v] of Object.entries(CITY_SOURCES)) SOURCES[k] = { name: v.name, license: v.license, url: v.url };
 
 const root = new URL('../', import.meta.url);
 const config = JSON.parse(await readFile(new URL('config.json', root), 'utf8'));
@@ -75,6 +77,7 @@ const kept = items.filter((it) => !(it.c === 'geldautomat' && it.t.amenity === '
 const usedSources = { osm: kept.length };
 if (!process.env.NO_EXTERNAL) {
   const ext = await loadExternal(config.states || config.regions.map((r) => r.name));
+  Object.assign(ext, await loadCities());
   const G = 0.005;
   const gk = (la, lo) => `${Math.floor(la / G)}_${Math.floor(lo / G)}`;
   const grid = new Map();
@@ -105,7 +108,7 @@ if (!process.env.NO_EXTERNAL) {
     } else { kept.push(it); addGrid(it); }
   }
   if (ext.autobahn) usedSources.autobahn = ext.autobahn.length;
-  for (const name of ['dortmund', 'muenster', 'koeln', 'overture']) {
+  for (const name of ['dortmund', 'muenster', 'koeln', ...Object.keys(CITY_SOURCES), 'overture']) {
     let added = 0;
     for (const it of ext[name] || []) {
       const r = it.c === 'paketshop' ? 60 : it.c === 'toilette' ? 60 : 40;
