@@ -32,7 +32,7 @@ button { font: inherit; color: inherit; cursor: pointer; }
 #map { position: fixed; inset: 0; }
 
 /* Kopf */
-.top { position: fixed; top: 0; left: 0; right: 0; padding: calc(var(--safe-top) + 10px) 12px 0; pointer-events: none; z-index: 5; }
+.top { position: fixed; top: 0; left: 0; right: 0; padding: calc(var(--safe-top) + 4px) 12px 0; pointer-events: none; z-index: 5; }
 .loc { pointer-events: auto; display: flex; align-items: center; gap: 10px; background: var(--card); border-radius: 14px; padding: 8px 12px 8px 9px; box-shadow: var(--shadow); max-width: 520px; }
 .logo { width: 30px; height: 30px; border-radius: 8px; background: var(--accent) url("icons/icon.svg") center/cover; flex: none; }
 .loc-text { min-width: 0; flex: 1; }

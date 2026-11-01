@@ -411,13 +411,7 @@ function refPoint() {
   const c = map.getCenter();
   return { lat: c.lat, lon: c.lng, mine: false };
 }
-function updateHeader() {
-  const r = refPoint();
-  $('#loc-over').textContent = r.mine ? 'Dein Standort' : 'Kartenmitte';
-  const name = state.places.length ? nearestPlace(r, 20000) : null;
-  if (name) $('#loc-name').textContent = name;
-  else if (state.index && map.getZoom() < MIN_LOAD_ZOOM) $('#loc-name').textContent = state.index.regions.join(' · ');
-}
+function updateHeader() { /* Kopfzeile entfernt – nur noch Kategorien oben */ }
 function setMe(pos) {
   const first = !state.me;
   state.me = { lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy };
@@ -845,7 +839,6 @@ async function init() {
     map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: extra.length ? 'Weitere Daten: ' + extra.join(', ') : undefined }), 'bottom-left');
     setTimeout(() => document.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show'), 1500);
     const g = new Date(state.index.generated);
-    $('#stand').innerHTML = `Stand<br>${g.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit' })}`;
     body.innerHTML = '<div class="empty">Orte werden geladen …</div>';
     layoutSheet();
     if (map.loaded()) loadVisible(); else map.once('load', loadVisible);
