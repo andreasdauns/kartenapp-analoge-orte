@@ -1,13 +1,13 @@
 """Overture Maps Places für Deutschland: Paketshops, Paketstationen, Postfilialen, Geldautomaten, Toiletten.
 
 Schreibt work/overture.json (Orte) und work/overture_meta.json (Kennzahlen für die Fehlersuche).
-Nur Einträge, deren Quellen alle eine klare offene Lizenz haben (Meta, Microsoft: CDLA-Permissive-2.0;
-Foursquare: Apache 2.0). AllThePlaces & Co. bleiben vorerst draußen.
+Lizenzen: CDLA-Permissive-2.0 (Overture, Meta, Microsoft, BrightQuery, PinMeTo, …) bzw. Apache 2.0 (Foursquare).
+Einträge mit AllThePlaces als Quelle bleiben vorerst draußen.
 """
 import json, re, sys, urllib.request
 import duckdb
 
-ALLOWED = {"meta", "microsoft", "foursquare"}
+DENY = {"alltheplaces"}  # Lizenzlage umstritten (gescrapte Filialfinder)
 BBOX = (5.86, 47.27, 15.05, 55.06)  # Deutschland
 PARCEL_RE = r"(?i)(paket ?-?shop|packstation|poststation|postfiliale|deutsche post|dhl|hermes|\bdpd\b|pickup|\bgls\b|\bups\b|access point|amazon (hub|locker|counter)|myflexbox|deinfach|paketbox|paketstation)"
 
@@ -75,7 +75,7 @@ def main():
         ds = set(d["ds"] or [])
         for s in ds:
             meta["by_source"][s] = meta["by_source"].get(s, 0) + 1
-        if not ds or not ds <= ALLOWED:
+        if not ds or ds & DENY:
             continue
         if (d["confidence"] or 0) < 0.6 or (d["status"] and str(d["status"]).lower() not in ("open", "none")):
             continue
@@ -86,7 +86,9 @@ def main():
             c = "toilette"
         elif re.search(r"(?i)packstation|poststation|locker|paketbox|myflexbox|deinfach|paketstation", text):
             c = "packstation"
-        elif re.search(PARCEL_RE, text) or re.search(r"post_office|shipping|courier|parcel|package|mail", cat):
+        elif re.search(r"(?i)depot|logistik|spedition|zentrum|niederlassung|\bhub\b|lager|transport|zustellbasis|verteil|cargo|freight|umzug|kurier", text):
+            continue  # Depots, Speditionen usw. sind keine Abgabestellen
+        elif re.search(PARCEL_RE, text):
             c = "paketshop"
         else:
             continue
