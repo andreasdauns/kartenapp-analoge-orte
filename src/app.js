@@ -828,6 +828,20 @@ if (R.enabled()) {
   $('#btn-add').addEventListener('click', openAdd);
 }
 
+// ---------- Begrüßung beim ersten Start ----------
+async function shareApp() {
+  const url = location.origin + location.pathname;
+  const data = { title: 'Around the Corner', text: 'Briefkästen, Paketshops, Container, Toiletten & mehr um die Ecke – kostenlos:', url };
+  try {
+    if (navigator.share) { await navigator.share(data); return; }
+    await navigator.clipboard.writeText(url);
+    toast('Link kopiert – danke fürs Weiterempfehlen!');
+  } catch { /* abgebrochen */ }
+}
+if (!store.get('welcomed', false)) $('#welcome').hidden = false;
+$('#welcome-go').addEventListener('click', () => { $('#welcome').hidden = true; store.set('welcomed', true); });
+$('#welcome-share').addEventListener('click', shareApp);
+
 // ---------- Start ----------
 async function init() {
   renderChips();

@@ -154,3 +154,10 @@ body.dragging .fabs, body.dragging .maplibregl-ctrl-bottom-left { transition: no
 
 .zoomhint { position: fixed; left: 50%; top: 45%; transform: translate(-50%, -50%); z-index: 3; background: var(--card); color: var(--ink); padding: 10px 16px; border-radius: 999px; font-size: 14px; font-weight: 600; box-shadow: var(--shadow); pointer-events: none; white-space: nowrap; }
 .zoomhint[hidden] { display: none; }
+
+/* Begrüßung */
+.welcome { place-items: center; }
+.welcome .chooser-card { max-height: 88vh; overflow-y: auto; padding: 22px 18px 14px; }
+.welcome-logo { width: 56px; height: 56px; border-radius: 14px; }
+.welcome p { color: var(--ink); font-size: 14.5px; line-height: 1.45; margin: 0; }
+.welcome-tips { margin: 2px 0 6px; padding-left: 18px; color: var(--muted); font-size: 13.5px; line-height: 1.5; }
