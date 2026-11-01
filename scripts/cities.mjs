@@ -1,6 +1,8 @@
 // Offene Daten einzelner Städte (Toiletten, Container). Jede Quelle einzeln, Fehler werden übersprungen.
 // Lizenzen siehe CITY_SOURCES. Formate am 01.11.2026 geprüft.
 
+import { readFile } from 'node:fs/promises';
+
 const UA = { 'User-Agent': 'around-the-corner/1.0 (https://github.com/andreasdauns/kartenapp-analoge-orte)' };
 const get = async (url, type = 'json') => {
   const res = await fetch(url, { headers: UA, signal: AbortSignal.timeout(120000) });
@@ -158,6 +160,23 @@ export const CITY_SOURCES = {
       const name = p.name || p.bezeichnung || p.titel || p.standort;
       if (p._c === 'toilette') return { c: 'toilette', t: toilet({ name, description: p.oeffnungszeiten || p.beschreibung || undefined }) };
       return { c: p._c, t: container(p._c, { operator: 'Stadt Trier', description: name }) };
+    },
+  },
+  leipzig: {
+    name: 'Stadt Leipzig', license: 'dl-de/by-2.0', url: 'https://opendata.leipzig.de',
+    fetch: async () => {
+      let csv;
+      try { csv = await get('https://geodaten.leipzig.de/open_data/organisationseinheit/Amt_fuer_Geoinformation_und_Bodenordnung/Toilettenstandorte/Oeffentliche_Toiletten_Stadt_Leipzig.csv', 'text'); }
+      catch { csv = await readFile(new URL('../sources/leipzig_toiletten.csv', import.meta.url), 'utf8'); } // Kopie vom 01.11.2026
+      const lines = csv.replace(/^\uFEFF/, '').split(/\r?\n/).filter(Boolean);
+      const split = (l) => (l.match(/("([^"]*)"|[^,]*)(,|$)/g) || []).map((x) => x.replace(/,$/, '').replace(/^"|"$/g, ''));
+      const head = split(lines.shift());
+      return { features: lines.map((l) => { const r = split(l); const p = Object.fromEntries(head.map((h, i) => [h, r[i]])); return { geometry: { type: 'Point', coordinates: [+p.long, +p.lat] }, properties: p }; }) };
+    },
+    map: (p) => {
+      if (/geschlossen/i.test(p.Oeffnungszeiten || '')) return null;
+      const free = /kostenfrei|kostenlos/i.test(p.Entgelt || '');
+      return { c: 'toilette', t: toilet({ name: p.Ort, operator: p.Betreiber, opening_hours: hoursDE(p.Oeffnungszeiten), fee: free ? 'no' : p.Entgelt ? 'yes' : undefined, charge: free ? undefined : p.Entgelt?.replace(/\s*\(.*\)/, ''), wheelchair: /barrierefrei/i.test(p.Ausstattung || '') ? 'yes' : /barrierearm/i.test(p.Ausstattung || '') ? 'limited' : undefined, changing_table: /wickel/i.test(p.Ausstattung || '') ? 'yes' : undefined, unisex: /all gender/i.test(p.Ausstattung || '') ? 'yes' : undefined }) };
     },
   },
   essen: {
