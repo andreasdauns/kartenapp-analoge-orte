@@ -77,6 +77,16 @@
     <p>Beim Tippen auf „Route“ öffnet sich Google Maps, Apple Karten oder Waze. Ab dann gelten deren Datenschutzbestimmungen.</p>
   </section>
 
+  <section id="impressum">
+    <h2>Impressum</h2>
+    <p>Angaben gemäß § 5 DDG:<br>
+    Andreas Dauns<br>
+    Am Alten Brunnen 31<br>
+    53474 Bad Neuenahr-Ahrweiler<br>
+    E-Mail: <a class="mail" href="#impressum">anzeigen</a></p>
+    <p class="small">Verantwortlich für den Inhalt: Andreas Dauns (Anschrift wie oben). Hinweise zu fehlerhaften Orten bitte direkt in der App melden.</p>
+  </section>
+
   <section id="kontakt">
     <h2>Kontakt</h2>
     <p>Fragen, Hinweise zu Daten oder Kooperationen: <a id="mail" href="#kontakt">E-Mail anzeigen</a></p>
@@ -85,9 +95,10 @@
 </main>
 <script>
   // E-Mail-Adresse erst beim Klick zusammensetzen (Schutz vor Spam-Bots)
-  document.getElementById('mail').addEventListener('click', (e) => {
+  for (const el of document.querySelectorAll('#mail, .mail')) el.addEventListener('click', (e) => {
     const a = e.currentTarget, m = ['andreas.dauns', 'gmail.com'].join('@');
-    a.href = 'mailto:' + m + '?subject=Around%20the%20Corner'; a.textContent = m;
+    if (a.textContent === m) return;
+    e.preventDefault(); a.href = 'mailto:' + m + '?subject=Around%20the%20Corner'; a.textContent = m;
   });
   fetch('data/index.json').then((r) => r.json()).then((d) => {
     const rows = Object.values(d.sources || {}).sort((a, b) => (b.count || 0) - (a.count || 0));
