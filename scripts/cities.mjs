@@ -2,6 +2,7 @@
 // Lizenzen siehe CITY_SOURCES. Formate am 01.11.2026 geprüft.
 
 import { readFile } from 'node:fs/promises';
+import { parcelInfo } from '../src/categories.js';
 
 const UA = { 'User-Agent': 'around-the-corner/1.0 (https://github.com/andreasdauns/kartenapp-analoge-orte)' };
 const get = async (url, type = 'json') => {
@@ -11,9 +12,9 @@ const get = async (url, type = 'json') => {
 };
 
 // UTM Zone 32N (EPSG:25832) -> WGS84, falls eine Quelle keine Längen-/Breitengrade liefert
-function utm32ToLatLon(E, N) {
+function utm32ToLatLon(E, N, zone = 32) {
   const a = 6378137, f = 1 / 298.257222101, k0 = 0.9996, e2 = f * (2 - f), ep2 = e2 / (1 - e2);
-  const x = E - 500000, y = N, lon0 = (9 * Math.PI) / 180;
+  const x = E - 500000, y = N, lon0 = ((zone * 6 - 183) * Math.PI) / 180;
   const M = y / k0, mu = M / (a * (1 - e2 / 4 - (3 * e2 ** 2) / 64 - (5 * e2 ** 3) / 256));
   const e1 = (1 - Math.sqrt(1 - e2)) / (1 + Math.sqrt(1 - e2));
   const p = mu + (3 * e1 / 2 - 27 * e1 ** 3 / 32) * Math.sin(2 * mu) + (21 * e1 ** 2 / 16 - 55 * e1 ** 4 / 32) * Math.sin(4 * mu) + (151 * e1 ** 3 / 96) * Math.sin(6 * mu);
@@ -28,7 +29,7 @@ function pointOf(geom) {
   let c = geom.type === 'Point' ? geom.coordinates : geom.type === 'MultiPoint' ? geom.coordinates[0] : null;
   if (!c) return null;
   let [x, y] = c;
-  if (Math.abs(x) > 180) return utm32ToLatLon(x, y);
+  if (Math.abs(x) > 180) return utm32ToLatLon(x, y, geom.zone || 32);
   return [y, x];
 }
 
@@ -113,6 +114,19 @@ function kmlFeatures(kml) {
     for (const m of pm.matchAll(/<SimpleData name="([^"]+)">([^<]*)<\/SimpleData>/g)) props[m[1]] = m[2];
     const n = /<name>([^<]*)<\/name>/.exec(pm); if (n) props.name = n[1];
     feats.push({ geometry: { type: 'Point', coordinates: [+c[1], +c[2]] }, properties: props });
+  }
+  return { features: feats };
+}
+
+// INSPIRE-GML (z. B. Rostock): Punkte + Beschreibung aus dem XML ziehen
+function gmlFeatures(xml, zone = 33) {
+  const feats = [];
+  for (const m of xml.split(/<wfs:member>/).slice(1)) {
+    const pos = /<gml:pos[^>]*>\s*([\d.]+)\s+([\d.]+)/.exec(m);
+    if (!pos) continue;
+    const desc = /<gml:description>([^<]*)</.exec(m)?.[1];
+    const name = /<gml:name>([^<]*)</.exec(m)?.[1];
+    feats.push({ geometry: { type: 'Point', coordinates: [+pos[1], +pos[2]], zone }, properties: { description: desc, name } });
   }
   return { features: feats };
 }
@@ -317,6 +331,32 @@ export const CITY_SOURCES = {
     fetch: () => csvFeatures('https://opendata.soest.de/dataset/e96b9f10-0684-4d1c-ba5f-43dcbef1c209/resource/767212a9-e383-4473-b6b4-7d85ee9eb30a/download/oeffentliche_toiletten_stadtsoest.csv'),
     map: (p) => ({ c: 'toilette', t: toilet({ name: p.name || p.Name || p.bezeichnung || p.Bezeichnung || p.standort || p.Standort, opening_hours: hoursDE(p.oeffnungszeiten || p.Oeffnungszeiten || p['Öffnungszeiten']) }) }),
   },
+
+  rostock: {
+    name: 'Hanse- und Universitätsstadt Rostock', license: 'CC0', url: 'https://geo.sv.rostock.de',
+    fetch: async () => {
+      const feats = [];
+      for (const [svc, ft, c] of [
+        ['us-emf-glassrecyclingbins', 'us-emf:EnvironmentalManagementFacility', 'glas'],
+        ['us-emf-clothingdonationbins', 'us-emf:EnvironmentalManagementFacility', 'altkleider'],
+        ['us-govserv-parcellockers', 'us-govserv:GovernmentalService', 'packstation'],
+      ]) {
+        try {
+          const xml = await get(`https://geo.sv.rostock.de/inspire/${svc}/download?service=WFS&version=2.0.0&request=GetFeature&typenames=${ft}`, 'text');
+          for (const f of gmlFeatures(xml, 33).features) feats.push({ ...f, properties: { ...f.properties, _c: c } });
+        } catch { /* Ebene fehlt */ }
+      }
+      return { features: feats };
+    },
+    map: (p) => (p._c === 'packstation'
+      ? { c: 'packstation', t: { amenity: 'parcel_locker', name: p.description || p.name } }
+      : { c: p._c, t: container(p._c, { operator: 'Hansestadt Rostock', description: p.description }) }),
+  },
+  luenen: {
+    name: 'Stadt Lünen', license: 'CC BY 4.0', url: 'https://geoportal.luenen.de',
+    fetch: () => get('https://geoportal.luenen.de/arcgis/rest/services/Wertstoffsammelstellen/MapServer/864/query?where=1%3D1&outFields=*&outSR=4326&f=geojson'),
+    map: (p) => containersFrom(p, 'Stadt Lünen'),
+  },
   leipzig: {
     name: 'Stadt Leipzig', license: 'dl-de/by-2.0', url: 'https://opendata.leipzig.de',
     fetch: async () => {
@@ -370,7 +410,9 @@ export async function loadCities() {
         if (!Array.isArray(m)) m = [m];
         for (const x of m) {
           for (const k of Object.keys(x.t)) if (x.t[k] === undefined || x.t[k] === null || x.t[k] === '') delete x.t[k];
-          items.push({ id: `${key}:${items.length}`, c: x.c, lat: +pt[0].toFixed(6), lon: +pt[1].toFixed(6), t: x.t, src: key });
+          const it = { id: `${key}:${items.length}`, c: x.c, lat: +pt[0].toFixed(6), lon: +pt[1].toFixed(6), t: x.t, src: key };
+          if (x.c === 'packstation' || x.c === 'paketshop') { const pi = parcelInfo(x.t); it.pk = pi.kind; it.pv = pi.pv; it.ps = pi.send; }
+          items.push(it);
         }
       }
       result[key] = items;
