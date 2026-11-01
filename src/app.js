@@ -254,6 +254,7 @@ $('#chips').addEventListener('click', (e) => {
   const id = b.dataset.id;
   if (state.active.has(id)) state.active.delete(id); else state.active.add(id); // jede Kategorie einzeln an/aus
   store.set('cats', [...state.active]);
+  zoomHint();
   renderChips();
   renderProviders();
   applyFilter();
@@ -317,7 +318,7 @@ async function setupLayers() {
   map.addLayer({ id: 'me', type: 'circle', source: 'me', paint: { 'circle-radius': 7, 'circle-color': '#1A73E8', 'circle-stroke-color': '#fff', 'circle-stroke-width': 2.5 } });
   map.addSource('pois', { type: 'geojson', data: geojson() });
   map.addLayer({
-    id: 'pois', type: 'symbol', source: 'pois',
+    id: 'pois', type: 'symbol', source: 'pois', minzoom: MIN_LOAD_ZOOM,
     layout: {
       'icon-image': ['get', 'c'],
       'icon-size': ['interpolate', ['linear'], ['zoom'], 9, 0.4, 13, 0.62, 16, 0.85, 18, 1],
@@ -339,6 +340,11 @@ map.on('click', (e) => { if (!e.originalEvent.__handled && state.selected && !st
 map.on('mouseenter', 'pois', () => { map.getCanvas().style.cursor = 'pointer'; });
 map.on('mouseleave', 'pois', () => { map.getCanvas().style.cursor = ''; });
 let moveTimer;
+function zoomHint() {
+  const h = $('#zoomhint');
+  if (h) h.hidden = !(state.active.size && map.getZoom() < MIN_LOAD_ZOOM);
+}
+map.on('zoom', zoomHint);
 map.on('moveend', () => {
   clearTimeout(moveTimer);
   moveTimer = setTimeout(() => {
