@@ -1,7 +1,7 @@
 -- Nahfuchs: Absicherung der Meldungen (2.11.2026)
 -- Einmal komplett in Supabase unter "SQL Editor" einfügen und auf "Run" klicken.
 -- Bewirkt:
---  1. Meldungen für die neue Kategorie "Wertstoffhöfe" sind erlaubt.
+--  1. Meldungen für die neuen Kategorien "Wertstoffhöfe" und "Apotheken" sind erlaubt.
 --  2. Lesen geht nur noch über die Funktion reports_in_box: höchstens ein begrenzter
 --     Kartenausschnitt und 3.000 Meldungen pro Abruf. Ein Komplett-Download der Tabelle geht nicht mehr.
 --  3. Geräte-Kennungen werden nur noch pro Ort verschlüsselt (SHA-256) herausgegeben,
@@ -10,7 +10,7 @@
 -- 1) neue Kategorie
 alter table public.reports drop constraint if exists reports_category_check;
 alter table public.reports add constraint reports_category_check
-  check (category in ('briefkasten','glas','papier','altkleider','wertstoffhof','toilette','rastplatz','paketshop','packstation','geldautomat','ladesaeule'));
+  check (category in ('briefkasten','glas','papier','altkleider','wertstoffhof','toilette','rastplatz','paketshop','packstation','geldautomat','ladesaeule','apotheke'));
 
 -- 2) geschützte Lese-Funktion
 create or replace function public.reports_in_box(s double precision, w double precision, n double precision, e double precision)

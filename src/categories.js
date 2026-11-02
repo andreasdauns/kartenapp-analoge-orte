@@ -57,6 +57,11 @@ export const CATEGORIES = [
     icon: txt('€', 15),
   },
   {
+    id: 'apotheke', label: 'Apotheke', plural: 'Apotheken-Notdienst',
+    color: '#C62828', ink: '#FFFFFF',
+    icon: svg('<path d="M9.5 3.5h5v6h6v5h-6v6h-5v-6h-6v-5h6z"/>'),
+  },
+  {
     id: 'ladesaeule', label: 'Ladesäule', plural: 'Ladesäulen',
     color: '#E0590B', ink: '#FFFFFF',
     icon: svg('<path d="M13 2.5L5 13.5h6l-1 8 8-11h-6z"/>'),
@@ -89,6 +94,7 @@ export function classify(tags = {}) {
     || /paket ?-?shop|hermes paket|pickup paket/i.test(tags.name || '')) out.push('paketshop');
   if (a === 'atm' || (a === 'bank' && tags.atm !== 'no')) out.push('geldautomat');
   if (a === 'charging_station' && !noAccess) out.push('ladesaeule');
+  if ((a === 'pharmacy' || tags.healthcare === 'pharmacy') && !noAccess && tags.dispensing !== 'no') out.push('apotheke');
   return out;
 }
 
@@ -133,4 +139,4 @@ export function parcelInfo(tags = {}) {
 
 // Tags, die in die App übernommen werden (der Rest wird verworfen, um die Datei klein zu halten).
 export const KEEP_TAG = (k) =>
-  /^(name|operator|brand|ref|collection_times|opening_hours|fee|charge|wheelchair|changing_table|centralkey|access|check_date.*|survey:date|capacity|recycling_type|recycling:.*|toilets.*|drive_through|description|level|addr:.*|amenity|highway|vending|socket:.*|motorcar|cash_in|indoor|unisex|male|female|post_box:type|parcel_mail_in|parcel_pickup|website|atm|ref:.*|post_office.*|parcel_locker:.*|payment|autobahn:.*)$/.test(k);
+  /^(name|operator|brand|ref|collection_times|opening_hours|fee|charge|wheelchair|changing_table|centralkey|access|check_date.*|survey:date|capacity|recycling_type|recycling:.*|toilets.*|drive_through|description|level|addr:.*|amenity|highway|vending|socket:.*|motorcar|cash_in|indoor|unisex|male|female|post_box:type|parcel_mail_in|parcel_pickup|website|phone|contact:phone|healthcare|dispensing|atm|ref:.*|post_office.*|parcel_locker:.*|payment|autobahn:.*)$/.test(k);

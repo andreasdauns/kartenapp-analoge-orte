@@ -61,8 +61,6 @@ body.dragging .fabs, body.dragging .maplibregl-ctrl-bottom-left { transition: no
 .fab svg { width: 24px; height: 24px; }
 .fab.active { background: var(--accent); color: var(--card); }
 #btn-add { background: var(--fox); color: var(--fox-ink); }
-.fab-pill { width: auto; height: 36px; border-radius: 18px; padding: 0 12px 0 10px; display: flex; align-items: center; gap: 6px; align-self: flex-end; color: #C62828; text-decoration: none; font-size: 13px; font-weight: 600; }
-.fab-pill svg { width: 16px; height: 16px; }
 
 /* Unteres Blatt (ziehbar) */
 .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; height: var(--sheet-max, 74vh); background: var(--card); border-radius: 20px 20px 0 0; box-shadow: 0 -6px 24px rgba(16,32,24,.16); padding: 0 16px; display: flex; flex-direction: column; transform: translateY(calc(var(--sheet-max, 74vh) - var(--sheet-h, 150px))); transition: transform .28s cubic-bezier(.2,.8,.2,1); will-change: transform; touch-action: none; }
@@ -204,3 +202,7 @@ body.dragging .fabs, body.dragging .maplibregl-ctrl-bottom-left { transition: no
 .ob-dots span.on { width: 22px; border-radius: 4px; background: var(--accent); }
 .ob-foot .btn { flex: none; width: auto; padding: 0 26px; }
 .ob-foot .link { flex: none; }
+.notdienst { display: flex; flex-direction: column; gap: 2px; margin: 4px 0 10px; padding: 12px 14px; border-radius: 14px; background: #FDECEC; color: #8E1B1B; text-decoration: none; border: 1px solid #F3C4C4; }
+.notdienst b { font-size: 15.5px; }
+.notdienst span { font-size: 13.5px; text-decoration: underline; }
+@media (prefers-color-scheme: dark) { .notdienst { background: #3A1A1A; color: #FFC9C9; border-color: #5A2A2A; } }

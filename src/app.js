@@ -84,6 +84,7 @@ function titleOf(it) {
     case 'paketshop': return it.pk === 'filiale' ? 'Postfiliale' : 'Paketshop';
     case 'geldautomat': return 'ATM';
     case 'ladesaeule': return 'Ladesäule';
+    case 'apotheke': return t.name || 'Apotheke';
     case 'briefkasten': return 'Briefkasten';
     case 'toilette': return t.name && !/^(wc|toilette)$/i.test(t.name) ? t.name : 'Öffentliche Toilette';
     case 'rastplatz': return t.name || 'Rastplatz';
@@ -224,7 +225,12 @@ function factsOf(it) {
     add('Kostenpflichtig', jaNein(t.fee));
     add('Bezahlen', t.payment?.replace(/;/g, ', '));
   }
-  if (!['geldautomat', 'ladesaeule', 'packstation', 'paketshop'].includes(it.c)) add('Betreiber', t.operator);
+  if (it.c === 'apotheke') {
+    add('Öffnungszeiten', weekSummary(parseHours(t.opening_hours)) || t.opening_hours || 'unbekannt');
+    add('Telefon', t.phone || t['contact:phone']);
+    add('Notdienst', 'nachts, sonn- und feiertags: aponet.de/notdienstsuche');
+  }
+  if (!['geldautomat', 'ladesaeule', 'packstation', 'paketshop', 'apotheke'].includes(it.c)) add('Betreiber', t.operator);
   add('Adresse', addressOf(t));
   add('Ort', it.place || (it.place = nearestPlace(it)));
   add('Hinweis', t.description);
@@ -565,6 +571,11 @@ function providerHint() {
   if (!weak.length) return '';
   return `<div class="hint">${esc(weak.map((p) => PROV[p].label).join(', '))}: Shops sind in den Kartendaten nur teilweise erfasst. Offizielle Suche: ${weak.map((p) => `<a href="${PROV[p].finder}" target="_blank" rel="noopener">${esc(PROV[p].label)} ↗</a>`).join(' · ')}</div>`;
 }
+const NOTDIENST_URL = 'https://www.aponet.de/notdienstsuche';
+function notdienstHint() {
+  if (!state.active.has('apotheke')) return '';
+  return `<a class="notdienst" href="${NOTDIENST_URL}" target="_blank" rel="noopener"><b>Welche Apotheke hat jetzt Notdienst?</b><span>Offizielle Notdienstsuche der Apothekerkammern öffnen ↗</span></a>`;
+}
 function renderList() {
   if (!state.index) return;
   const ref = refPoint();
@@ -586,7 +597,8 @@ function renderList() {
   const loadingHere = keysAround(ref.lat, ref.lon, 0).some((k) => state.loading.has(k));
   const empty = loadingHere ? 'Orte werden geladen …' : (tileKey(ref.lat, ref.lon) in state.index.tiles ? 'In der Nähe ist nichts eingetragen.' : 'Dieses Gebiet ist noch nicht in der App (bisher: ' + state.index.regions.join(', ') + ').');
   body.innerHTML = `
-    <div class="sheet-h"><h2>Nächste ${esc(only)}</h2><span class="from">${ref.mine ? '' : 'ab Kartenmitte'}</span></div>
+    <div class="sheet-h"><h2>Nächste ${esc(only === 'Apotheken-Notdienst' ? 'Apotheken' : only)}</h2><span class="from">${ref.mine ? '' : 'ab Kartenmitte'}</span></div>
+    ${notdienstHint()}
     ${list.length ? list.map((x) => rowHtml(x.it, ref)).join('') : `<div class="empty">${esc(empty)}</div>`}
     ${list.length > PEEK_ROWS && state.mode === 'peek' ? '<div class="hint">Nach oben ziehen für mehr</div>' : ''}
     ${providerHint()}`;
