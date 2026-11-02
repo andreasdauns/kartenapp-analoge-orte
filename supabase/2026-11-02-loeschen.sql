@@ -24,3 +24,8 @@ create extension if not exists pg_cron;
 select cron.unschedule(jobid) from cron.job where jobname = 'nahfuchs-meldungen-loeschen';
 select cron.schedule('nahfuchs-meldungen-loeschen', '15 3 * * *',
   $$delete from public.reports where created_at < now() - interval '12 months'$$);
+
+-- 3) Keine freien Texte mehr (Entscheidung 2.11.): vorhandene Texte entfernen und neue verhindern
+update public.reports set message = null where message is not null;
+alter table public.reports drop constraint if exists reports_no_text;
+alter table public.reports add constraint reports_no_text check (message is null);

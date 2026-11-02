@@ -637,7 +637,7 @@ function openDetail(it, fly = false) {
         : (!it.src ? `<a class="btn" href="${noteUrl(it)}" target="_blank" rel="noopener">${ICON_FLAG}Korrigieren</a>` : '')}
     </div>
     ${state.nav ? `<div class="navpref">Navigation mit ${esc(NAV[state.nav].name)} · <button id="navchange">ändern</button></div>` : ''}
-    <div class="src">${sourceLine(it, checked)}${hasUserContent(it) ? ` · <a href="${flagUrl(it)}">Inhalt melden</a>` : ''}</div>
+    <div class="src">${sourceLine(it, checked)}</div>
   </div>`;
   $('#close').addEventListener('click', closeDetail);
   $('#navchange')?.addEventListener('click', () => openChooser(null));
@@ -645,17 +645,6 @@ function openDetail(it, fly = false) {
   $('#confirm')?.addEventListener('click', () => submit({ place_id: it.id, category: it.c, kind: 'confirm', lat: it.lat, lon: it.lon }, 'Danke für die Bestätigung!'));
   layoutSheet();
   if (fly) map.easeTo({ center: [it.lon, it.lat], zoom: Math.max(map.getZoom(), 16) });
-}
-// Meldeweg für rechtswidrige oder unzulässige Nutzerinhalte (Art. 16 DSA)
-function hasUserContent(it) {
-  const r = repOf(it);
-  return it.src === 'user' || Boolean(r && (r.notes.length || r.hours || r.closed?.text));
-}
-function flagUrl(it) {
-  const mail = ['andreas.dauns.apps', 'gmail.com'].join('@');
-  const subj = `Inhalt melden – ${titleOf(it)} (${it.id})`;
-  const text = `Ort: ${titleOf(it)} (${it.id}, ${it.lat.toFixed(5)}, ${it.lon.toFixed(5)})\nWelcher Inhalt (Text der Meldung):\n\nWarum ist er unzulässig?\n\nIch versichere, dass meine Angaben nach bestem Wissen richtig und vollständig sind.\nName (optional):`;
-  return `mailto:${mail}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}`;
 }
 function sourceLine(it, checked) {
   const S = state.index?.sources || {};
@@ -718,18 +707,10 @@ function reportChips(it) {
   if (r.status) { const [cls, label] = STATUS_TEXT[r.status.value] || ['', r.status.value]; out.push({ cls, text: `${label} · ${R.ago(r.status.at)}` }); }
   if (r.closed) out.push({ cls: 'bad', text: `Geschlossen gemeldet · ${R.ago(r.closed.at)}` });
   if (r.gone.size) out.push({ cls: r.gone.size >= 2 ? 'bad' : 'warn', text: `${r.gone.size}× als verschwunden gemeldet` });
-  if (r.hours) out.push({ cls: 'warn', text: 'Zeiten geändert (Meldung)' });
+  if (r.hours) out.push({ cls: 'warn', text: `Zeiten evtl. falsch (gemeldet ${R.ago(r.hours.at)})` });
   return out;
 }
-function reportFacts(it) {
-  const r = repOf(it);
-  if (!r) return [];
-  const f = [];
-  if (r.hours) f.push(['Neue Zeiten (Meldung)', `${r.hours.text} · ${R.ago(r.hours.at)}`]);
-  if (r.closed?.text) f.push(['Geschlossen', r.closed.text]);
-  for (const n of r.notes) f.push(['Hinweis', `${n.text} · ${R.ago(n.at)}`]);
-  return f;
-}
+function reportFacts() { return []; } // Nutzertexte werden bewusst nicht angezeigt
 
 function applyReports() {
   const all = [];
@@ -740,7 +721,7 @@ function applyReports() {
   for (const [id, r] of state.rep) {
     if (!r.newPlace || state.items.some((it) => it.id === id)) continue;
     const n = r.newPlace;
-    state.items.push({ id, c: n.category, lat: n.lat, lon: n.lon, t: n.message ? { name: n.message } : {}, src: 'user' });
+    state.items.push({ id, c: n.category, lat: n.lat, lon: n.lon, t: {}, src: 'user' });
     added = true;
   }
   if (added || all.length) map.getSource('pois')?.setData(geojson());
@@ -791,7 +772,7 @@ async function submit(report, thanks = 'Danke! Deine Meldung ist gespeichert.') 
 function openReport(it) {
   const grp = R.statusGroup(it.c);
   const base = { place_id: it.id, category: it.c, lat: it.lat, lon: it.lon };
-  const timesLabel = it.c === 'briefkasten' ? 'Leerungszeit geändert' : isContainer(it.c) ? 'Einwurfzeiten geändert' : 'Öffnungszeiten geändert';
+  const timesLabel = it.c === 'briefkasten' ? 'Leerungszeit stimmt nicht' : isContainer(it.c) ? 'Einwurfzeiten stimmen nicht' : 'Öffnungszeiten stimmen nicht';
   $('#report-card').innerHTML = `
     <h2>${esc(titleOf(it))} melden</h2>
     ${grp ? `<div class="sec">Wie sieht es gerade aus?</div><div class="opts">${R.STATUS_OPTIONS[grp].map(([v, l]) => `<button class="btn" data-status="${v}">${esc(l)}</button>`).join('')}</div>` : ''}
@@ -800,34 +781,15 @@ function openReport(it) {
       <button class="btn" data-kind="hours">${esc(timesLabel)}</button>
       <button class="btn" data-kind="closed">Vorübergehend geschlossen</button>
       <button class="btn" data-kind="gone">Gibt es nicht mehr</button>
-      <button class="btn" data-kind="note">Sonstiger Hinweis</button>
-    </div>
-    <div id="report-text" hidden>
-      <textarea id="report-msg" rows="3" maxlength="300"></textarea>
-      <div class="privacy-hint">Für alle sichtbar. Bitte keine Namen, Telefonnummern, Kfz-Kennzeichen oder andere persönliche Angaben.</div>
-      <button class="btn primary small" id="report-send" style="width:100%;margin-top:8px">Senden</button>
     </div>
     <button class="link" data-close>Abbrechen</button>`;
   const card = $('#report-card');
-  let kind = null;
   card.onclick = (e) => {
     const b = e.target.closest('button');
     if (!b) return;
     if (b.dataset.close !== undefined) { $('#report').hidden = true; return; }
     if (b.dataset.status) return submit({ ...base, kind: 'status', status: b.dataset.status });
-    if (b.dataset.kind === 'gone') return submit({ ...base, kind: 'gone' });
-    if (b.dataset.kind) {
-      kind = b.dataset.kind;
-      $('#report-text').hidden = false;
-      $('#report-msg').placeholder = { hours: it.c === 'briefkasten' ? 'z. B. Mo–Fr 16:00, Sa 11:00' : 'z. B. Mo–Sa 7–20 Uhr', closed: 'z. B. Baustelle bis Ende November (optional)', note: 'Was sollten andere wissen?' }[kind];
-      $('#report-msg').focus();
-      return;
-    }
-    if (b.id === 'report-send') {
-      const msg = $('#report-msg').value.trim();
-      if (kind !== 'closed' && !msg) { $('#report-msg').focus(); return; }
-      submit({ ...base, kind, message: msg || null });
-    }
+    if (b.dataset.kind) return submit({ ...base, kind: b.dataset.kind });
   };
   $('#report').hidden = false;
 }
@@ -843,8 +805,8 @@ function openAdd() {
       <button class="close" id="add-cancel" aria-label="Abbrechen">${ICON_X}</button></div>
     <div class="add-sec">Was ist dort?</div>
     <div class="cat-pick">${CATEGORIES.map((c) => `<button class="chip" data-cat="${c.id}" aria-pressed="false" style="--c:${c.color};--k:${c.ink}"><span class="ic">${c.icon}</span>${esc(c.label)}</button>`).join('')}</div>
-    <div class="add-row"><input type="text" id="add-name" maxlength="120" placeholder="Name oder Hinweis (optional)"><button class="btn primary" id="add-save">Melden</button></div>
-    <div class="src">Erscheint sofort blass und gilt als bestätigt, sobald ${R.CONFIRM_NEEDED} Personen ihn bestätigt haben. Für alle sichtbar – bitte keine persönlichen Angaben. Mit dem Melden akzeptierst du die <a href="info.html#nutzung" target="_blank">Nutzungsbedingungen</a>.</div>
+    <div class="add-row"><button class="btn primary" id="add-save">Melden</button></div>
+    <div class="src">Erscheint sofort blass und gilt als bestätigt, sobald ${R.CONFIRM_NEEDED} Personen ihn bestätigt haben. Mit dem Melden akzeptierst du die <a href="info.html#nutzung" target="_blank">Nutzungsbedingungen</a>.</div>
   </div>`;
   state.selected = { adding: true };
   body.querySelectorAll('[data-cat]').forEach((b) => b.addEventListener('click', () => {
@@ -857,10 +819,9 @@ function openAdd() {
     if (!cat) { toast('Bitte zuerst auswählen, was dort ist.'); return; }
     const c = map.getCenter();
     const id = `new:${(crypto.randomUUID?.() || String(Date.now())).replace(/-/g, '').slice(0, 20)}`;
-    const msg = $('#add-name').value.trim();
     $('#crosshair').hidden = true;
     state.selected = null;
-    await submit({ place_id: id, category: cat, kind: 'new', lat: +c.lat.toFixed(6), lon: +c.lng.toFixed(6), message: msg || null }, 'Danke! Der Ort ist eingetragen und wartet auf Bestätigung.');
+    await submit({ place_id: id, category: cat, kind: 'new', lat: +c.lat.toFixed(6), lon: +c.lng.toFixed(6) }, 'Danke! Der Ort ist eingetragen und wartet auf Bestätigung.');
     state.active.add(cat);
     store.set('cats', [...state.active]);
     renderChips(); applyFilter();
