@@ -1,4 +1,4 @@
-import { CATEGORIES, CATEGORY_BY_ID, PROVIDERS } from './categories.js';
+import { CATEGORIES, CATEGORY_BY_ID, PROVIDERS, CARDS, fuelInfo, fuelCardsPassing } from './categories.js';
 import { parseHours, nextPoint, openState, weekSummary } from './hours.js';
 import * as R from './reports.js';
 
@@ -33,11 +33,18 @@ const state = {
   mode: 'peek', // peek | full
   nav: store.get('navApp', null), // google | apple | waze
   providers: new Set(store.get('prov', []).filter((id) => PROVIDERS.some((p) => p.id === id))), // leer = alle Anbieter
+  cards: new Set(store.get('cards', []).filter((id) => CARDS.some((c) => c.id === id))), // leer = alle Tankstellen
 };
 const PROV = Object.fromEntries(PROVIDERS.map((p) => [p.id, p]));
 const PARCEL = ['packstation', 'paketshop'];
 const allProviders = () => state.providers.size === 0;
-const passes = (it) => state.active.has(it.c) && (!PARCEL.includes(it.c) || allProviders() || (it.pv || []).some((p) => state.providers.has(p)));
+const CARD = Object.fromEntries(CARDS.map((c) => [c.id, c]));
+const FUEL = 'tankstelle';
+const fuelOf = (it) => it._fi || (it._fi = fuelInfo(it.t));
+// Mit gewählten Karten: jede gewählte Karte muss „bestätigt“ oder „laut Marke üblich“ sein
+const cardsOk = (it) => state.cards.size === 0 || [...state.cards].every((c) => ['ok', 'likely'].includes(fuelOf(it).cards[c]?.lv));
+const passes = (it) => state.active.has(it.c) && (!PARCEL.includes(it.c) || allProviders() || (it.pv || []).some((p) => state.providers.has(p)))
+  && (it.c !== FUEL || cardsOk(it));
 
 // ---------- Hilfsfunktionen ----------
 function distM(a, b) {
@@ -88,6 +95,7 @@ function titleOf(it) {
     case 'briefkasten': return 'Briefkasten';
     case 'toilette': return t.name && !/^(wc|toilette)$/i.test(t.name) ? t.name : 'Öffentliche Toilette';
     case 'rastplatz': return t.name || 'Rastplatz';
+    case 'tankstelle': return fuelOf(it).brand?.label || t.brand || t.name || t.operator || 'Tankstelle';
     case 'wertstoffhof': {
       if (t.name && !/^(wertstoffhof|recyclinghof)$/i.test(t.name)) return t.name;
       const green = t['recycling:green_waste'] === 'yes' || t['recycling:garden_waste'] === 'yes';
@@ -107,6 +115,10 @@ function subOf(it) {
     parts.push((it.pv || []).map((p) => PROV[p]?.label).filter(Boolean).join(', '));
   }
   if (it.c === 'wertstoffhof') parts.push(t.operator);
+  if (it.c === FUEL) {
+    const title = titleOf(it).toLowerCase();
+    parts.push([t.operator, t.brand, t.name].find((v) => v && !v.toLowerCase().includes(title) && !title.includes(v.toLowerCase())));
+  }
   if (it.c === 'ladesaeule') {
     const kw = Math.max(0, ...Object.keys(t).filter((k) => /^socket:.+:output$/.test(k)).map((k) => parseFloat(t[k]) || 0));
     parts.push([t.operator || t.brand, kw ? `${kw} kW` : null].filter(Boolean).join(' · '));
@@ -128,6 +140,10 @@ function statusOf(it, now = new Date()) {
     if (!p) return t.collection_times ? { cls: '', text: `Leerung: ${t.collection_times}` } : { cls: 'warn', text: 'Leerung unbekannt' };
     const n = nextPoint(p, now);
     return n ? { cls: n.offset === 0 ? 'ok' : '', text: `Leerung ${n.text}` } : null;
+  }
+  if (it.c === FUEL) {
+    if (!t.opening_hours) return { cls: '', text: 'Öffnungszeiten unbekannt' };
+    if (parseHours(t.opening_hours)?.always) return { cls: 'ok', text: '24 h geöffnet' };
   }
   if (t.opening_hours && /geschlossen|closed/i.test(t.opening_hours) && !parseHours(t.opening_hours)) return { cls: 'bad', text: t.opening_hours.replace(/"/g, '') };
   if (t.opening_hours) {
@@ -230,15 +246,64 @@ function factsOf(it) {
     add('Telefon', t.phone || t['contact:phone']);
     add('Notdienst', 'nachts, sonn- und feiertags: aponet.de/notdienstsuche');
   }
-  if (!['geldautomat', 'ladesaeule', 'packstation', 'paketshop', 'apotheke'].includes(it.c)) add('Betreiber', t.operator);
+  if (it.c === FUEL) {
+    const fi = fuelOf(it);
+    add('Marke', fi.brand?.label || t.brand);
+    add('Betreiber', t.operator);
+    add('Öffnungszeiten', weekSummary(parseHours(t.opening_hours)) || t.opening_hours || 'unbekannt – vorher prüfen');
+    add('Kraftstoffe', FUELS.filter(([keys]) => keys.some((k) => t[`fuel:${k}`] && t[`fuel:${k}`] !== 'no')).map(([, l]) => l).join(', '));
+    f.push(['Tankkarten', cardsHtml(it), true]);
+    const eq = [];
+    if (t.shop && t.shop !== 'no') eq.push('Shop');
+    if (t.car_wash === 'yes') eq.push('Waschanlage');
+    if (t.toilets === 'yes') eq.push('WC');
+    if (t.compressed_air === 'yes') eq.push('Luft');
+    if (t.hgv === 'yes') eq.push('Lkw geeignet');
+    if (t.automated === 'yes') eq.push('Automat (ohne Personal)');
+    add('Ausstattung', eq.join(', '));
+  }
+  if (!['geldautomat', 'ladesaeule', 'packstation', 'paketshop', 'apotheke', FUEL].includes(it.c)) add('Betreiber', t.operator);
   add('Adresse', addressOf(t));
   add('Ort', it.place || (it.place = nearestPlace(it)));
   add('Hinweis', t.description);
   return f;
 }
 
+const FUELS = [
+  [['diesel'], 'Diesel'], [['octane_95', 'e5'], 'Super E5'], [['e10'], 'Super E10'], [['octane_98', 'octane_100', 'octane_102'], 'Super Plus'],
+  [['HGV_diesel', 'hgv_diesel'], 'Lkw-Diesel'], [['hvo', 'HVO', 'hvo100', 'HVO100'], 'HVO'], [['adblue'], 'AdBlue'],
+  [['lpg'], 'LPG/Autogas'], [['cng', 'biogas'], 'CNG/Erdgas'], [['lng'], 'LNG'], [['e85'], 'E85'], [['h70', 'h35', 'hydrogen'], 'Wasserstoff'],
+];
+const CARD_LV = { ok: ['ok', '✓ bestätigt'], likely: ['likely', '✓ laut Marke üblich'], no: ['bad', '✗ nicht akzeptiert'], unk: ['unk', '– unbekannt'] };
+function cardsHtml(it) {
+  const fi = fuelOf(it);
+  return `<div class="cards">${CARDS.map((c) => {
+    const x = fi.cards[c.id];
+    const [cls, text] = x.app && x.lv === 'likely' ? ['warn', 'nur per App'] : CARD_LV[x.lv];
+    return `<div class="card-row${state.cards.has(c.id) ? ' sel' : ''}"><span class="cl">${esc(c.label)}</span><span class="st lv ${cls}">${esc(text)}</span>${x.app && x.lv === 'ok' ? '<span class="st lv warn">laut Anbieter nur per App</span>' : ''}</div>`;
+  }).join('')}</div>`;
+}
+// In der Liste: Hinweis, wenn eine gewählte Karte hier nur per App geht (z. B. DKV bei JET)
+function appBadge(it) {
+  const app = [...state.cards].filter((c) => fuelOf(it).cards[c]?.app).map((c) => CARD[c].label);
+  return app.length ? ` <span class="st lv warn">${esc(app.join(', '))} nur per App</span>` : '';
+}
+function fuelHint(it) {
+  if (it.c !== FUEL) return '';
+  const fi = fuelOf(it);
+  const app = CARDS.filter((c) => fi.cards[c.id].app).map((c) => c.label);
+  const likely = CARDS.some((c) => fi.cards[c.id].lv === 'likely');
+  const finders = CARDS.filter((c) => c.finder).map((c) => `<a href="${c.finder}" target="_blank" rel="noopener">${esc(c.finderLabel || c.label)}</a>`).join(' · ');
+  return `<div class="cardhint">${app.length ? `<p><b>${esc(app.join(', '))}:</b> hier laut Anbieter nur digital per App (z. B. DKV App&amp;Go), nicht mit der Plastikkarte.</p>` : ''}${likely ? '<p>„Laut Marke üblich“: Die Karte gilt an Stationen dieser Marke laut Kartenanbieter, ist hier aber nicht einzeln bestätigt.</p>' : ''}<p>Kartenannahme ohne Gewähr – keine Verbindung zu den Kartenanbietern. Im offiziellen Finder prüfen: ${finders}</p></div>`;
+}
+
 function extraChips(it) {
   const t = it.t, out = [];
+  if (it.c === FUEL) {
+    const fi = fuelOf(it);
+    for (const c of state.cards) if (fi.cards[c]?.app) out.push({ cls: 'warn', text: `${CARD[c].label} nur per App` });
+    if (t.automated === 'yes') out.push({ cls: '', text: 'Automat' });
+  }
   if (it.c === 'briefkasten' && t.collection_times) {
     const checked = t['check_date:collection_times'] || t.check_date || t['survey:date'];
     if (!checked || checked < POST_CHANGE) out.push({ cls: 'warn', text: 'Zeit evtl. veraltet' });
@@ -261,8 +326,21 @@ function renderProviders() {
   const show = PARCEL.some((c) => state.active.has(c));
   $('#providers').hidden = !show;
   $('#providers').innerHTML = PROVIDERS.map((p) => `<button class="chip pv" data-pv="${p.id}" aria-pressed="${state.providers.has(p.id)}">${esc(p.label)}</button>`).join('');
+  const fuel = CATEGORY_BY_ID[FUEL];
+  $('#cards').hidden = !state.active.has(FUEL);
+  $('#cards').innerHTML = CARDS.map((c) => `<button class="chip pv cd" data-card="${c.id}" aria-pressed="${state.cards.has(c.id)}" style="--c:${fuel.color};--k:${fuel.ink}">${esc(c.label)}</button>`).join('');
   layoutSheet();
 }
+$('#cards').addEventListener('click', (e) => {
+  const b = e.target.closest('.chip');
+  if (!b) return;
+  const id = b.dataset.card;
+  if (state.cards.has(id)) state.cards.delete(id); else state.cards.add(id); // Mehrfachauswahl, leer = alle
+  store.set('cards', [...state.cards]);
+  renderProviders();
+  applyFilter();
+  if (state.selected && !state.selected.adding) openDetail(state.selected); else if (!state.selected) renderList();
+});
 $('#providers').addEventListener('click', (e) => {
   const b = e.target.closest('.chip');
   if (!b) return;
@@ -320,13 +398,18 @@ function markerImage(cat) {
 
 const fc = (features) => ({ type: 'FeatureCollection', features });
 const pointF = (lon, lat, props = {}) => ({ type: 'Feature', properties: props, geometry: { type: 'Point', coordinates: [lon, lat] } });
-const geojson = () => fc(state.items.map((it, i) => pointF(it.lon, it.lat, { c: it.c, i, pv: it.pv ? `|${it.pv.join('|')}|` : '', u: it.src === 'user' && !isConfirmed(it) ? 1 : 0 })));
+const geojson = () => fc(state.items.map((it, i) => pointF(it.lon, it.lat, {
+  c: it.c, i, pv: it.pv ? `|${it.pv.join('|')}|` : '',
+  fc: it.c === FUEL ? `|${fuelCardsPassing(fuelOf(it)).join('|')}|` : '',
+  u: it.src === 'user' && !isConfirmed(it) ? 1 : 0,
+})));
 
 function applyFilter() {
   if (!map.getLayer('pois')) return;
-  const cats = ['in', ['get', 'c'], ['literal', [...state.active]]];
-  if (allProviders()) { map.setFilter('pois', cats); return; }
-  map.setFilter('pois', ['all', cats, ['any', ['!', ['in', ['get', 'c'], ['literal', PARCEL]]], ...[...state.providers].map((p) => ['in', `|${p}|`, ['get', 'pv']])]]);
+  const conds = [['in', ['get', 'c'], ['literal', [...state.active]]]];
+  if (!allProviders()) conds.push(['any', ['!', ['in', ['get', 'c'], ['literal', PARCEL]]], ...[...state.providers].map((p) => ['in', `|${p}|`, ['get', 'pv']])]);
+  if (state.cards.size) conds.push(['any', ['!=', ['get', 'c'], FUEL], ['all', ...[...state.cards].map((c) => ['in', `|${c}|`, ['get', 'fc']])]]);
+  map.setFilter('pois', conds.length === 1 ? conds[0] : ['all', ...conds]);
 }
 
 async function setupLayers() {
@@ -557,7 +640,7 @@ function rowHtml(it, ref) {
   return `<div class="row" data-i="${it._i}" role="button" tabindex="0">
     <span class="ic" style="--c:${cat.color};--k:${cat.ink}">${cat.icon}</span>
     <span class="main">
-      <div class="name">${esc(titleOf(it))}</div>
+      <div class="name">${esc(titleOf(it))}${it.c === FUEL ? appBadge(it) : ''}</div>
       <div class="meta">${st ? `<span class="st ${st.cls}">${esc(st.text)}</span>` : ''}<span class="sub">${esc(sub)}</span></div>
     </span>
     <span class="dist">${fmtDist(distM(ref, it))}</span>
@@ -570,6 +653,10 @@ function providerHint() {
   const weak = [...state.providers].filter((p) => p !== 'dhl' && PROV[p]?.finder);
   if (!weak.length) return '';
   return `<div class="hint">${esc(weak.map((p) => PROV[p].label).join(', '))}: Shops sind in den Kartendaten nur teilweise erfasst. Offizielle Suche: ${weak.map((p) => `<a href="${PROV[p].finder}" target="_blank" rel="noopener">${esc(PROV[p].label)} ↗</a>`).join(' · ')}</div>`;
+}
+function cardHint() {
+  if (!state.cards.size || !state.active.has(FUEL)) return '';
+  return `<div class="hint">Tankstellen mit ${esc([...state.cards].map((c) => CARD[c].label).join(' + '))}: bestätigt oder laut Marke üblich – ohne Gewähr.</div>`;
 }
 const NOTDIENST_URL = 'https://www.aponet.de/notdienstsuche';
 function notdienstHint() {
@@ -601,7 +688,8 @@ function renderList() {
     ${notdienstHint()}
     ${list.length ? list.map((x) => rowHtml(x.it, ref)).join('') : `<div class="empty">${esc(empty)}</div>`}
     ${list.length > PEEK_ROWS && state.mode === 'peek' ? '<div class="hint">Nach oben ziehen für mehr</div>' : ''}
-    ${providerHint()}`;
+    ${providerHint()}
+    ${cardHint()}`;
   layoutSheet();
 }
 body.addEventListener('click', (e) => {
@@ -628,7 +716,8 @@ function openDetail(it, fly = false) {
       <button class="close" id="close" aria-label="Schließen">${ICON_X}</button>
     </div>
     ${chips.length ? `<div class="status-line">${chips.map((c) => `<span class="st ${c.cls}">${esc(c.text)}</span>`).join('')}</div>` : ''}
-    <dl class="facts">${[...factsOf(it), ...reportFacts(it)].map(([k, v]) => `<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>
+    <dl class="facts">${[...factsOf(it), ...reportFacts(it)].map(([k, v, html]) => `<dt>${esc(k)}</dt><dd>${html ? v : esc(v)}</dd>`).join('')}</dl>
+    ${fuelHint(it)}
     <div class="actions">
       <a class="btn primary" data-route="${it._i}" href="${routeUrl(it)}" target="_blank" rel="noopener">${ICON_ROUTE}Route</a>
       ${R.enabled() ? (it.src === 'user' && !isConfirmed(it)

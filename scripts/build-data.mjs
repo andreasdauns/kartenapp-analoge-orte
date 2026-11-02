@@ -6,7 +6,7 @@
 import { createReadStream } from 'node:fs';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import readline from 'node:readline';
-import { classify, KEEP_TAG, parcelInfo } from '../src/categories.js';
+import { classify, fuelBrand, KEEP_TAG, parcelInfo } from '../src/categories.js';
 import { loadExternal, SOURCES } from './external.mjs';
 import { loadCities, CITY_SOURCES } from './cities.mjs';
 for (const [k, v] of Object.entries(CITY_SOURCES)) SOURCES[k] = { name: v.name, license: v.license, url: v.url };
@@ -53,7 +53,7 @@ for await (let line of rl) {
   const cats = classify(tags);
   if (!cats.length) continue;
   const t = {};
-  for (const [k, v] of Object.entries(tags)) if (KEEP_TAG(k)) t[k] = v;
+  for (const [k, v] of Object.entries(tags)) if (KEEP_TAG(k, cats)) t[k] = v;
   for (const c of cats) {
     const it = { id: `${type[0]}${id}`, c, lat, lon, t };
     if (c === 'packstation' || c === 'paketshop') {
@@ -71,7 +71,34 @@ for (const it of items) if (it.c === 'geldautomat' && it.t.amenity === 'atm') {
   const a = Math.round(it.lat * 1000), b = Math.round(it.lon * 1000);
   for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) atmCells.add(`${a + i}_${b + j}`);
 }
-const kept = items.filter((it) => !(it.c === 'geldautomat' && it.t.amenity === 'bank' && atmCells.has(cell(it.lat, it.lon))));
+const kept0 = items.filter((it) => !(it.c === 'geldautomat' && it.t.amenity === 'bank' && atmCells.has(cell(it.lat, it.lon))));
+
+// Tankstellen doppelt erfasst (Punkt + Fläche/Dach derselben Station): innerhalb von 60 m und gleicher
+// (oder fehlender) Marke zusammenführen. Behalten wird der Eintrag mit mehr Angaben, fehlende Tags werden ergänzt.
+const fuelScore = (t) => Object.keys(t).filter((k) => k.startsWith('payment:') || k.startsWith('fuel:')).length + (t.opening_hours ? 3 : 0) + (t.brand ? 1 : 0);
+const dropFuel = new Set();
+{
+  const fuel = kept0.filter((it) => it.c === 'tankstelle');
+  const G = 0.002, fgrid = new Map();
+  const fk = (la, lo) => `${Math.floor(la / G)}_${Math.floor(lo / G)}`;
+  for (const it of fuel) { const k = fk(it.lat, it.lon); if (!fgrid.has(k)) fgrid.set(k, []); fgrid.get(k).push(it); }
+  for (const it of fuel) {
+    if (dropFuel.has(it)) continue;
+    const y = Math.floor(it.lat / G), x = Math.floor(it.lon / G), b = fuelBrand(it.t)?.id;
+    scan: for (let i = -1; i <= 1; i++) for (let j = -1; j <= 1; j++) for (const o of fgrid.get(`${y + i}_${x + j}`) || []) {
+      if (o === it || dropFuel.has(o) || o.id[0] === it.id[0]) continue; // nur Punkt ↔ Fläche
+      const ob = fuelBrand(o.t)?.id;
+      if (b && ob && b !== ob) continue;
+      const d = Math.hypot((o.lat - it.lat) * 111320, (o.lon - it.lon) * 111320 * Math.cos(it.lat * Math.PI / 180));
+      if (d > 60) continue;
+      const [keep, drop] = fuelScore(o.t) > fuelScore(it.t) ? [o, it] : [it, o];
+      for (const [k, v] of Object.entries(drop.t)) if (!(k in keep.t)) keep.t[k] = v;
+      dropFuel.add(drop);
+      if (drop === it) break scan;
+    }
+  }
+}
+const kept = kept0.filter((it) => !dropFuel.has(it));
 
 // ---------- Zusätzliche Quellen einmischen ----------
 const usedSources = { osm: kept.length };

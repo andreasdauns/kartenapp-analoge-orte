@@ -42,6 +42,11 @@ export const CATEGORIES = [
     icon: txt('P', 15),
   },
   {
+    id: 'tankstelle', label: 'Tankstelle', plural: 'Tankstellen',
+    color: '#0B5D6E', ink: '#FFFFFF',
+    icon: svg('<path d="M5 21V4.5A1.5 1.5 0 0 1 6.5 3h6A1.5 1.5 0 0 1 14 4.5V21M3.5 21h12M5 10h9"/><path d="M14 12.5h1.5A1.5 1.5 0 0 1 17 14v3a1.5 1.5 0 0 0 3 0V8.5L17.5 6"/>'),
+  },
+  {
     id: 'paketshop', label: 'Postfiliale / Paketshop', plural: 'Filialen & Paketshops',
     color: '#C0267A', ink: '#FFFFFF',
     icon: svg('<path d="M3.5 9.5L5 4h14l1.5 5.5"/><path d="M3.5 9.5c0 1.4 1.1 2.5 2.5 2.5s2.5-1.1 2.5-2.5c0 1.4 1.1 2.5 2.5 2.5h2c1.4 0 2.5-1.1 2.5-2.5 0 1.4 1.1 2.5 2.5 2.5s2.5-1.1 2.5-2.5"/><path d="M5 12v8.5h14V12M10 20.5v-5h4v5"/>'),
@@ -94,6 +99,8 @@ export function classify(tags = {}) {
     || /paket ?-?shop|hermes paket|pickup paket/i.test(tags.name || '')) out.push('paketshop');
   if (a === 'atm' || (a === 'bank' && tags.atm !== 'no')) out.push('geldautomat');
   if (a === 'charging_station' && !noAccess) out.push('ladesaeule');
+  // Öffentliche Tankstellen – keine Werks-/Betriebstankstellen (access=private/no) und keine reinen Bootstankstellen
+  if (a === 'fuel' && !noAccess && !(tags.boat === 'yes' && tags.motorcar === 'no')) out.push('tankstelle');
   if ((a === 'pharmacy' || tags.healthcare === 'pharmacy') && !noAccess && tags.dispensing !== 'no') out.push('apotheke');
   return out;
 }
@@ -137,6 +144,123 @@ export function parcelInfo(tags = {}) {
   return { kind, pv, send };
 }
 
+// ---------- Tankstellen: Marken und Tankkarten ----------
+// Nur Text, keine Logos und keine Markenfarben (beschreibende Nennung, § 23 MarkenG).
+// Erkennung in der Reihenfolge brand → operator → name. Mehrere Einträge dürfen dieselbe id haben.
+export const FUEL_BRANDS = [
+  { id: 'aral', label: 'Aral', re: /\baral\b/i },
+  { id: 'shell', label: 'Shell', re: /\bshell\b/i },
+  { id: 'esso', label: 'Esso', re: /\besso\b/i },
+  { id: 'total', label: 'TotalEnergies', re: /total ?energies|\btotal\b/i },
+  { id: 'total', label: 'Circle K', re: /circle ?k\b/i }, // Circle K betreibt seit 2024 die TotalEnergies-Stationen in DE
+  { id: 'jet', label: 'JET', re: /\bjet\b/i },
+  { id: 'avia', label: 'AVIA', re: /\bavia\b/i },
+  { id: 'star', label: 'Star', re: /^star\b|\bstar tankstelle|\borlen\b/i },
+  { id: 'eni', label: 'Eni', re: /\beni\b|enilive|\bagip\b/i },
+  { id: 'hem', label: 'HEM', re: /\bhem\b|tamoil/i },
+  { id: 'westfalen', label: 'Westfalen', re: /\bwestfalen\b/i },
+  { id: 'raiffeisen', label: 'Raiffeisen', re: /raiffeisen|\brwg\b/i },
+  { id: 'baywa', label: 'BayWa', re: /\bbaywa\b/i },
+  { id: 'bft', label: 'bft', re: /\bbft\b/i },
+  { id: 'oil', label: 'OIL!', re: /\boil!|^oil\b/i },
+  { id: 'hoyer', label: 'Hoyer', re: /\bhoyer\b/i },
+  { id: 'q1', label: 'Q1', re: /\bq1\b/i },
+  { id: 'classic', label: 'Classic', re: /\bclassic\b/i },
+  { id: 'sprint', label: 'Sprint', re: /^sprint\b|\bsprint tankstelle/i },
+  { id: 'team', label: 'team', re: /^team\b|\bteam energie|\bteam tankstelle/i },
+  { id: 'markant', label: 'Markant', re: /\bmarkant\b/i },
+  { id: 'calpam', label: 'Calpam', re: /\bcalpam\b/i },
+  { id: 'ed', label: 'ED', re: /^ed( tankstelle)?$/i },
+  { id: 'tankpool24', label: 'tankpool24', re: /tank ?pool ?24/i },
+];
+
+/** Marke einer Tankstelle: {id, label} oder null. */
+export function fuelBrand(tags = {}) {
+  for (const k of ['brand', 'operator', 'name']) {
+    const v = tags[k];
+    if (!v) continue;
+    const b = FUEL_BRANDS.find((x) => x.re.test(v));
+    if (b) return b;
+  }
+  return null;
+}
+
+// Die sechs Tankkarten im Filter (Reihenfolge = Reihenfolge der Chips).
+// osm: payment:<key>-Schlüssel in OpenStreetMap inkl. üblicher Schreibvarianten (taginfo Geofabrik DE, abgefragt 2.11.2026).
+// finder: offizielle Akzeptanzsuche des Anbieters (nur verlinkt, nicht übernommen).
+export const CARDS = [
+  { id: 'dkv', label: 'DKV', osm: ['dkv', 'dkv_card'], finder: 'https://my.dkv-mobility.com/maps/' },
+  { id: 'uta', label: 'UTA', osm: ['uta', 'uta_card'], finder: 'https://web.uta.com/en/search' },
+  { id: 'aral', label: 'Aral / Routex', osm: ['routex', 'aral_card', 'aral_cardkomfort', 'aral_plus', 'bp_komfort'], finder: 'https://www.routex.com', finderLabel: 'Routex' },
+  { id: 'shell', label: 'Shell', osm: ['euroshell', 'shell', 'shell_card'] }, // nicht shell_clubsmart (Bonusprogramm)
+  { id: 'logpay', label: 'LogPay', osm: ['logpay'] },
+  { id: 'esso', label: 'Esso', osm: ['esso_card', 'esso'] },
+];
+
+// Stufe „laut Marke üblich“: dokumentierte Marken-Partnerschaften der Kartenanbieter.
+// 1 = Karte an dieser Marke üblich, 'app' = nur digital per App (nicht mit der Plastikkarte).
+// Keine Gewähr: einzelne Pächter/Autohöfe können abweichen. Etwa jährlich die Pressemitteilungen prüfen.
+export const CARD_RULES = {
+  dkv: {
+    aral: 1,          // firmenauto 11/2018: „beinahe jede Aral-Tankstelle“ – https://www.firmenauto.de/branche/dkv-erweitert-servicenetz-150-neue-aral-stationen-im-netz/
+    shell: 1,         // firmenauto 12/2025 (Partnerschaft erweitert) – https://www.firmenauto.de/who-is-who/tankkarten/tankkarten-dkv/
+    tankpool24: 1,    // firmenauto 12/2025 / Eurowag 9/2021: tankpool24 nimmt DKV
+    jet: 'app',       // VerkehrsRundschau 6/2024: alle JET-Stationen, aber nur per DKV App&Go – https://www.verkehrsrundschau.de/nachrichten/transport-logistik/article-3524339
+    classic: 'app',   // VerkehrsRundschau 8/2024: 160 Classic-Stationen per App&Go – https://www.verkehrsrundschau.de/nachrichten/transport-logistik/dkv-mobility-erweitert-akzeptanznetzwerk-um-160-classic-tankstellen-3549402
+    // Esso, TotalEnergies, AVIA, Star, Eni: sehr wahrscheinlich, aber ohne Primärquelle → bewusst „unbekannt“
+  },
+  uta: {
+    // UTA-Flyer „Economy-Netz“ 12/2025 – https://web.uta.com/fileadmin/user_upload/pdf-files/uta-economy-flyer.pdf
+    aral: 1, total: 1, esso: 1, avia: 1, jet: 1, star: 1, eni: 1, hem: 1, bft: 1, raiffeisen: 1, oil: 1,
+    westfalen: 1, hoyer: 1, q1: 1, ed: 1, baywa: 1, classic: 1, sprint: 1, team: 1, calpam: 1, markant: 1,
+    shell: 1,         // UTA-PM 17.9.2025: alle Shell-Stationen in DE seit 1.9.2025 – https://web.uta.com/en/press-releases/uta-edenred-adds-all-shell-service-stations-in-germany-to-its-acceptance-network
+  },
+  aral: {
+    aral: 1,          // eigene Marke – https://www.aral.de/de/global/fleet_solutions.html
+    eni: 1,           // ROUTEX-Partner (Enilive) – https://www.routex.com
+    total: 1,         // gegenseitige Akzeptanz Aral/TotalEnergies seit 2018 – https://www.auto-medienportal.net/artikel/detail/43235 (Stand nach Übernahme durch Circle K offen)
+    avia: 1,          // VerkehrsRundschau 3/2024: Aral-Karten an AVIA seit Q3 2024 – https://www.verkehrsrundschau.de/nachrichten/transport-logistik/avia-und-aral-kooperieren-bei-tankkarten-3497808
+  },
+  shell: {
+    shell: 1,         // eigene Marke
+    star: 1,          // mobilityplaza 7/2022: 570 ORLEN/star-Stationen – https://www.mobilityplaza.com/news/shell-expands-card-services-through-orlen-station-network-in-germany
+  },
+  logpay: {
+    aral: 1,          // VerkehrsRundschau 2018: LogPay an über 2.000 Aral-Stationen – https://www.verkehrsrundschau.de/nachrichten/nfz-fuhrpark/logpay-vereinbart-tankkartenakzeptanz-mit-bp-aral-2985025
+    esso: 1,          // Meldung „Esso accepts LogPay fuel cards“; Marktübersicht sprit+ 9/2022 – https://www.sprit-plus.de/downloadfile/3270152/Sprit%20_Ladekarten.pdf
+    // Shell, HEM, AVIA u. a. nur per Bezahl-App (sprit+ Pay-at-pump) → nicht als Kartenannahme gewertet
+  },
+  esso: {
+    esso: 1,          // eigene Marke – https://www.essocard.com/de-de/ (abgerufen 11/2026)
+    shell: 1,         // essocard.com: Esso-Karten werden an Shell-Stationen angenommen
+  },
+};
+
+/**
+ * Kartenannahme je Tankstelle.
+ * Stufen: ok = bestätigt (OSM payment:*=yes) · no = nicht akzeptiert (payment:*=no) · likely = laut Marke üblich · unk = unbekannt.
+ * app = laut Anbieter nur per App (z. B. DKV bei JET/Classic).
+ * @returns {{brand: {id,label}|null, cards: Object<string,{lv:string, app:boolean}>}}
+ */
+export function fuelInfo(tags = {}) {
+  const brand = fuelBrand(tags);
+  const cards = {};
+  for (const c of CARDS) {
+    const vals = c.osm.map((k) => tags[`payment:${k}`]).filter(Boolean);
+    const rule = brand ? CARD_RULES[c.id]?.[brand.id] : undefined;
+    let lv = 'unk';
+    if (vals.some((v) => v === 'yes')) lv = 'ok';
+    else if (vals.some((v) => v === 'no')) lv = 'no';
+    else if (rule) lv = 'likely';
+    cards[c.id] = { lv, app: rule === 'app' && lv !== 'no' };
+  }
+  return { brand, cards };
+}
+/** Karten, mit denen die Tankstelle den Filter besteht (bestätigt oder laut Marke üblich). */
+export const fuelCardsPassing = (info) => CARDS.filter((c) => ['ok', 'likely'].includes(info.cards[c.id].lv)).map((c) => c.id);
+
 // Tags, die in die App übernommen werden (der Rest wird verworfen, um die Datei klein zu halten).
-export const KEEP_TAG = (k) =>
-  /^(name|operator|brand|ref|collection_times|opening_hours|fee|charge|wheelchair|changing_table|centralkey|access|check_date.*|survey:date|capacity|recycling_type|recycling:.*|toilets.*|drive_through|description|level|addr:.*|amenity|highway|vending|socket:.*|motorcar|cash_in|indoor|unisex|male|female|post_box:type|parcel_mail_in|parcel_pickup|website|phone|contact:phone|healthcare|dispensing|atm|ref:.*|post_office.*|parcel_locker:.*|payment|autobahn:.*)$/.test(k);
+const KEEP_BASE = /^(name|operator|brand|ref|collection_times|opening_hours|fee|charge|wheelchair|changing_table|centralkey|access|check_date.*|survey:date|capacity|recycling_type|recycling:.*|toilets.*|drive_through|description|level|addr:.*|amenity|highway|vending|socket:.*|motorcar|cash_in|indoor|unisex|male|female|post_box:type|parcel_mail_in|parcel_pickup|website|phone|contact:phone|healthcare|dispensing|atm|ref:.*|post_office.*|parcel_locker:.*|payment|autobahn:.*)$/;
+// Nur bei Tankstellen: angezeigte Kraftstoffe, Tankkarten und Ausstattung
+const KEEP_FUEL = new RegExp(`^(fuel:(diesel|octane_95|e5|e10|octane_98|octane_100|octane_102|lpg|cng|lng|biogas|adblue|HGV_diesel|hgv_diesel|hvo|HVO|hvo100|HVO100|e85|h70|h35|hydrogen)|payment:(${CARDS.flatMap((c) => c.osm).join('|')})|car_wash|shop|compressed_air|hgv|automated)$`);
+export const KEEP_TAG = (k, cats) => KEEP_BASE.test(k) || (Boolean(cats?.includes('tankstelle')) && KEEP_FUEL.test(k));

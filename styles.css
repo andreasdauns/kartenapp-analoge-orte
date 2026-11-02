@@ -147,6 +147,22 @@ body.dragging .fabs, body.dragging .maplibregl-ctrl-bottom-left { transition: no
 .chip.pv[aria-pressed="true"] { background: var(--fox); color: #17241D; border-color: var(--fox); }
 .hint a { color: var(--accent-2); font-weight: 600; }
 
+/* Tankkarten-Filter und -Angaben */
+.chip.pv.cd { border-color: var(--c); }
+.chip.pv.cd[aria-pressed="true"] { background: var(--c); color: var(--k); border-color: var(--c); }
+.cards { display: flex; flex-direction: column; gap: 5px; }
+.card-row { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 8px; }
+.card-row .cl { min-width: 96px; font-weight: 550; }
+.card-row.sel .cl { font-weight: 800; }
+.st.lv { font-size: 12px; padding: 2px 8px; }
+.st.lv::before { display: none; }
+.st.unk { background: transparent; color: var(--muted); font-weight: 550; }
+.row .name .st.lv { vertical-align: 2px; margin-left: 4px; font-size: 11.5px; padding: 1px 7px; }
+.st.likely { background: transparent; color: var(--ok); box-shadow: inset 0 0 0 1.5px currentColor; }
+.cardhint { font-size: 12px; color: var(--muted); line-height: 1.45; margin: -4px 0 14px; }
+.cardhint p { margin: 0 0 4px; }
+.cardhint a { color: var(--accent-2); font-weight: 600; }
+
 /* Meldungen */
 .crosshair { position: fixed; left: 50%; top: var(--cross-y, 40vh); width: 44px; height: 44px; margin: -22px 0 0 -22px; z-index: 3; pointer-events: none; }
 .crosshair::before, .crosshair::after { content: ""; position: absolute; background: var(--accent); }
