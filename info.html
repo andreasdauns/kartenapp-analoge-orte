@@ -105,7 +105,7 @@
 <script>
   // E-Mail-Adresse erst beim Klick zusammensetzen (Schutz vor Spam-Bots)
   for (const el of document.querySelectorAll('#mail, .mail')) el.addEventListener('click', (e) => {
-    const a = e.currentTarget, m = ['andreas.dauns', 'gmail.com'].join('@');
+    const a = e.currentTarget, m = ['andreas.dauns.apps', 'gmail.com'].join('@');
     if (a.textContent === m) return;
     e.preventDefault(); a.href = 'mailto:' + m + '?subject=Naheck'; a.textContent = m;
   });
