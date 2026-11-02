@@ -37,7 +37,7 @@ export const CATEGORIES = [
     icon: txt('WC', 10),
   },
   {
-    id: 'rastplatz', label: 'Rastplatz', plural: 'Rastplätze (Autobahn)',
+    id: 'rastplatz', label: 'Rastplatz', plural: 'Rastplätze',
     color: '#1E3A8A', ink: '#FFFFFF',
     icon: txt('P', 15),
   },
