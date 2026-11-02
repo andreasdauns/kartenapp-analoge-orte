@@ -14,6 +14,14 @@ export function deviceId() {
   return id;
 }
 
+/** Gerätekennung je Ort, nicht über Orte hinweg verknüpfbar (wie in der Datenbank-Funktion reports_in_box). */
+export async function deviceKey(placeId) {
+  try {
+    const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(`${deviceId()}:${placeId}`));
+    return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('');
+  } catch { return deviceId(); }
+}
+
 export const CONFIRM_NEEDED = 3; // so viele verschiedene Geräte machen einen neuen Ort "bestätigt"
 const HOURS = 3600 * 1000;
 export const STATUS_TTL = { glas: 24 * HOURS, papier: 24 * HOURS, altkleider: 48 * HOURS, toilette: 12 * HOURS, rastplatz: 12 * HOURS };
@@ -27,6 +35,11 @@ export const statusGroup = (c) => (['glas', 'papier', 'altkleider'].includes(c) 
 /** Meldungen in einem Kartenausschnitt laden. */
 export async function fetchBox(s, w, n, e) {
   if (!enabled()) return [];
+  // Bevorzugt: geschützte Abfrage (begrenzter Ausschnitt, Geräte-IDs nur je Ort pseudonymisiert)
+  const rpc = await fetch(`${SUPABASE.url}/rest/v1/rpc/reports_in_box`, { method: 'POST', headers: H(), body: JSON.stringify({ s, w, n, e }) }).catch(() => null);
+  if (rpc && rpc.ok) return rpc.json();
+  if (rpc && rpc.status !== 404) throw new Error(`Meldungen: HTTP ${rpc.status}`);
+  // Übergang, solange die Funktion in der Datenbank noch fehlt
   const since = new Date(Date.now() - 365 * 24 * HOURS).toISOString();
   const q = `select=place_id,category,kind,status,message,lat,lon,device,created_at,expires_at&lat=gte.${s.toFixed(4)}&lat=lte.${n.toFixed(4)}&lon=gte.${w.toFixed(4)}&lon=lte.${e.toFixed(4)}&created_at=gte.${since}&order=created_at.desc&limit=5000`;
   const res = await fetch(`${SUPABASE.url}/rest/v1/reports?${q}`, { headers: H() });

@@ -754,7 +754,7 @@ async function submit(report, thanks = 'Danke! Deine Meldung ist gespeichert.') 
     await R.send(report);
     $('#report').hidden = true;
     toast(thanks);
-    const row = { ...report, device: R.deviceId(), created_at: new Date().toISOString(), expires_at: null };
+    const row = { ...report, device: await R.deviceKey(report.place_id), created_at: new Date().toISOString(), expires_at: null };
     if (report.kind === 'status' && R.STATUS_TTL[report.category]) row.expires_at = new Date(Date.now() + R.STATUS_TTL[report.category]).toISOString();
     if (!state.repRows.has(report.place_id)) state.repRows.set(report.place_id, []);
     state.repRows.get(report.place_id).push(row);
