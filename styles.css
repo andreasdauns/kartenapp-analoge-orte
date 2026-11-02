@@ -11,6 +11,7 @@
   --accent-2: #2E6B4A;
   --fox: #E8742A;
   --fox-ink: #17241D;
+  --chip-line: #9DB3A6; --chip-on: #1F4D3A; --chip-on-ink: #FFFFFF;
   --ok: #1F7A45;
   --ok-bg: #E3F3E8;
   --warn: #8A5A00;
@@ -28,6 +29,7 @@
   :root {
     --bg: #101713; --card: #18221C; --ink: #E7EEE9; --muted: #9AA9A0; --line: #2A3830;
     --accent: #8FD3AE; --accent-2: #8FD3AE; --fox: #F08A3C; --fox-ink: #17241D;
+    --chip-line: #46604F; --chip-on: #8FD3AE; --chip-on-ink: #10180F;
     --ok: #8FE0AE; --ok-bg: #1D3526; --warn: #F2C46B; --warn-bg: #3A2F14; --bad: #F2A0A4; --bad-bg: #3A1D1F;
   }
 }
@@ -51,8 +53,12 @@ button { font: inherit; color: inherit; cursor: pointer; }
 .chip .ic { width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--c); color: var(--k); }
 .chip .ic svg { width: 17px; height: 17px; }
 .chip .n { font-weight: 500; color: var(--muted); font-size: 12.5px; font-variant-numeric: tabular-nums; }
-.chip[aria-pressed="false"] { opacity: .5; box-shadow: none; }
-.chip[aria-pressed="false"] .ic { background: var(--line); color: var(--muted); }
+/* Kategorien: inaktiv weiß mit Rahmen und farbigem Symbol, aktiv dunkelgrün (Variante B, 2.11.) */
+.chip { border: 1.5px solid var(--chip-line); box-shadow: 0 2px 6px rgba(16,32,24,.18); color: var(--ink); }
+.chip[aria-pressed="false"] .ic { opacity: .9; }
+.chip[aria-pressed="true"] { background: var(--chip-on); color: var(--chip-on-ink); border-color: var(--chip-on); box-shadow: 0 3px 10px rgba(16,32,24,.30); }
+.chip[aria-pressed="true"] .ic { box-shadow: 0 0 0 2px var(--chip-on-ink); }
+.chip[aria-pressed="true"] .n { color: var(--chip-on-ink); opacity: .75; }
 
 /* Standort-Button */
 .fabs { position: fixed; right: 12px; bottom: calc(var(--sheet-h, 150px) + 12px); z-index: 4; display: flex; flex-direction: column; gap: 10px; transition: bottom .28s cubic-bezier(.2,.8,.2,1); }
@@ -135,11 +141,10 @@ body.dragging .fabs, body.dragging .maplibregl-ctrl-bottom-left { transition: no
 .chooser-card .link { border: 0; background: none; padding: 10px; color: var(--muted); font-weight: 600; }
 
 /* Anbieter-Filter (Paketdienste) */
-.chips.prov { padding-top: 0; margin-top: -4px; }
+.chips.prov { padding-top: 0; margin-top: -2px; }
 .chips.prov[hidden] { display: none; }
-.chip.pv { height: 32px; padding: 0 12px; font-size: 13px; }
-.chip.pv[aria-pressed="true"] { background: var(--accent); color: #fff; border-color: transparent; }
-@media (prefers-color-scheme: dark) { .chip.pv[aria-pressed="true"] { color: #10180F; } }
+.chip.pv { height: 32px; padding: 0 12px; font-size: 13px; border-color: var(--fox); background: var(--card); }
+.chip.pv[aria-pressed="true"] { background: var(--fox); color: #17241D; border-color: var(--fox); }
 .hint a { color: var(--accent-2); font-weight: 600; }
 
 /* Meldungen */
