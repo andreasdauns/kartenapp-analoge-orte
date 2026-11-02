@@ -126,7 +126,8 @@ function gmlFeatures(xml, zone = 33) {
     if (!pos) continue;
     const desc = /<gml:description>([^<]*)</.exec(m)?.[1];
     const name = /<gml:name>([^<]*)</.exec(m)?.[1];
-    feats.push({ geometry: { type: 'Point', coordinates: [+pos[1], +pos[2]], zone }, properties: { description: desc, name } });
+    const times = /<gmd:LocalisedCharacterString>([^<]*)</.exec(m)?.[1];
+    feats.push({ geometry: { type: 'Point', coordinates: [+pos[1], +pos[2]], zone }, properties: { description: desc, name, times } });
   }
   return { features: feats };
 }
@@ -340,6 +341,7 @@ export const CITY_SOURCES = {
         ['us-emf-glassrecyclingbins', 'us-emf:EnvironmentalManagementFacility', 'glas'],
         ['us-emf-clothingdonationbins', 'us-emf:EnvironmentalManagementFacility', 'altkleider'],
         ['us-govserv-parcellockers', 'us-govserv:GovernmentalService', 'packstation'],
+        ['us-govserv-postboxes', 'us-govserv:GovernmentalService', 'briefkasten'], // CC0 laut Mail vom 2.11.2026
       ]) {
         try {
           const xml = await get(`https://geo.sv.rostock.de/inspire/${svc}/download?service=WFS&version=2.0.0&request=GetFeature&typenames=${ft}`, 'text');
@@ -348,7 +350,9 @@ export const CITY_SOURCES = {
       }
       return { features: feats };
     },
-    map: (p) => (p._c === 'packstation'
+    map: (p) => (p._c === 'briefkasten'
+      ? { c: 'briefkasten', t: { amenity: 'post_box', operator: p.name || 'Deutsche Post AG', collection_times: p.times?.trim() || undefined } }
+      : p._c === 'packstation'
       ? { c: 'packstation', t: { amenity: 'parcel_locker', name: p.description || p.name } }
       : { c: p._c, t: container(p._c, { operator: 'Hansestadt Rostock', description: p.description }) }),
   },

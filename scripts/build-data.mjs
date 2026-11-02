@@ -116,7 +116,7 @@ if (!process.env.NO_EXTERNAL) {
       if (o) {
         // vorhandenen Eintrag mit amtlichen Zusatzinfos ergänzen (Öffnungszeiten, Gebühr, Barrierefreiheit …)
         let enriched = false;
-        if (name !== 'overture') for (const k of ['opening_hours', 'fee', 'charge', 'wheelchair', 'changing_table', 'unisex']) {
+        if (name !== 'overture') for (const k of ['opening_hours', 'collection_times', 'fee', 'charge', 'wheelchair', 'changing_table', 'unisex']) {
           if (it.t[k] && !o.t[k]) { o.t[k] = it.t[k]; enriched = true; }
         }
         if (enriched && !o.src2) { o.src2 = name; usedSources[`${name}_ergänzt`] = (usedSources[`${name}_ergänzt`] || 0) + 1; }
