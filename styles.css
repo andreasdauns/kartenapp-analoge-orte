@@ -184,3 +184,23 @@ body.dragging .fabs, body.dragging .maplibregl-ctrl-bottom-left { transition: no
 .chooser-card a.btn { text-align: center; text-decoration: none; }
 .support-note { text-align: center; font-size: 12.5px !important; color: var(--muted) !important; margin-top: 2px !important; }
 .link.inline { padding: 0; font-size: inherit; text-decoration: underline; }
+/* Begrüßung in drei Schritten */
+.onboard .ob-card { padding: 24px 20px 14px; gap: 0; min-height: 46vh; max-height: 70vh; overflow-y: auto; }
+.ob-slide { display: flex; flex-direction: column; gap: 14px; flex: 1; }
+.ob-slide[hidden] { display: none; }
+.ob-card h2 { font-size: 25px; font-weight: 800; line-height: 1.2; }
+.ob-card p { color: var(--ink); font-size: 17.5px; line-height: 1.45; margin: 0; }
+.ob-card .ob-sub { color: var(--muted); font-size: 15.5px; }
+.ob-badges { list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+.ob-badges li { background: var(--accent); color: var(--card); font-weight: 700; font-size: 15px; padding: 7px 13px; border-radius: 999px; }
+.ob-badges li::before { content: "✓ "; color: var(--fox); }
+.ob-steps { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 12px; counter-reset: ob; }
+.ob-steps li { counter-increment: ob; position: relative; padding-left: 38px; font-size: 17px; line-height: 1.4; }
+.ob-steps li::before { content: counter(ob); position: absolute; left: 0; top: -1px; width: 27px; height: 27px; border-radius: 50%; background: var(--fox); color: var(--fox-ink); font-weight: 800; font-size: 15px; display: grid; place-items: center; }
+.ob-plus { display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--fox); color: var(--fox-ink); font-weight: 800; line-height: 1; }
+.ob-foot { display: flex; align-items: center; gap: 8px; margin-top: 18px; }
+.ob-dots { display: flex; gap: 6px; margin-right: auto; }
+.ob-dots span { width: 8px; height: 8px; border-radius: 50%; background: var(--line); transition: width .2s; }
+.ob-dots span.on { width: 22px; border-radius: 4px; background: var(--accent); }
+.ob-foot .btn { flex: none; width: auto; padding: 0 26px; }
+.ob-foot .link { flex: none; }

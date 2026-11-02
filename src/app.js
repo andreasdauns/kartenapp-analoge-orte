@@ -857,8 +857,29 @@ async function shareApp() {
     toast('Link kopiert – danke fürs Weiterempfehlen!');
   } catch { /* abgebrochen */ }
 }
-if (!store.get('welcomed', false)) $('#welcome').hidden = false;
-$('#welcome-go').addEventListener('click', () => { $('#welcome').hidden = true; store.set('welcomed', true); });
+// Drei kurze Schritte beim ersten Start (zum Ansehen: ?willkommen)
+(function onboarding() {
+  const box = $('#welcome'), slides = [...box.querySelectorAll('.ob-slide')], dots = [...box.querySelectorAll('.ob-dots span')];
+  const next = $('#ob-next'); let i = 0;
+  const show = (n) => {
+    i = Math.max(0, Math.min(slides.length - 1, n));
+    slides.forEach((s, k) => { s.hidden = k !== i; });
+    dots.forEach((d, k) => d.classList.toggle('on', k === i));
+    const last = i === slides.length - 1;
+    next.textContent = last ? 'Los geht’s' : 'Weiter';
+    $('#ob-skip').style.visibility = last ? 'hidden' : '';
+  };
+  const done = () => { box.hidden = true; store.set('welcomed', true); };
+  next.addEventListener('click', () => (i === slides.length - 1 ? done() : show(i + 1)));
+  $('#ob-skip').addEventListener('click', done);
+  let x0 = null;
+  box.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+  box.addEventListener('touchend', (e) => {
+    if (x0 === null) return; const dx = e.changedTouches[0].clientX - x0; x0 = null;
+    if (Math.abs(dx) > 50) show(i + (dx < 0 ? 1 : -1));
+  });
+  if (!store.get('welcomed', false) || new URLSearchParams(location.search).has('willkommen')) { show(0); box.hidden = false; }
+})();
 $('#welcome-share').addEventListener('click', shareApp);
 
 // ---------- Freiwillige Unterstützung (frühestens nach 1 Woche und 3 Nutzungstagen) ----------

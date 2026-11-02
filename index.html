@@ -63,22 +63,32 @@
     </div>
   </div>
 
-  <div class="chooser welcome" id="welcome" hidden>
-    <div class="chooser-card" role="dialog" aria-modal="true" aria-labelledby="welcome-h">
-      <img src="icons/icon.svg" alt="" class="welcome-logo">
-      <h2 id="welcome-h">Willkommen bei Nahfuchs</h2>
-      <p>Briefkästen, Paketshops, Container, Toiletten, Geldautomaten und Ladesäulen – alles, was du im Alltag suchst, gleich um die Ecke. Egal, wo du gerade bist.</p>
-      <p><strong>Die App ist kostenlos und du brauchst kein Konto.</strong></p>
-      <p>Sie lebt vom Miteinander: Wenn du meldest, dass ein Container voll ist, eine Toilette geschlossen hat oder irgendwo ein neuer Briefkasten steht, hilfst du allen anderen. Jede Meldung macht die Karte genauer – und so kann die App kostenlos und frei verfügbar bleiben.</p>
-      <p>Gefällt sie dir? Dann freuen wir uns, wenn du sie weiterempfiehlst. Je mehr mitmachen, desto besser wird sie für alle.</p>
-      <ul class="welcome-tips">
-        <li>Oben antippen, was du suchst</li>
-        <li>Pfeil-Knopf: Route starten</li>
-        <li>Ort antippen → „Melden“, mit <b>+</b> einen neuen Ort eintragen</li>
-      </ul>
-      <button class="btn primary" id="welcome-go">Los geht’s</button>
-      <button class="btn" id="welcome-share">App weiterempfehlen</button>
-      <a href="info.html" class="welcome-more">Über die App · Datenquellen · Datenschutz</a>
+  <div class="chooser onboard" id="welcome" hidden>
+    <div class="chooser-card ob-card" role="dialog" aria-modal="true" aria-labelledby="ob-h0">
+      <section class="ob-slide">
+        <h2 id="ob-h0">Willkommen bei deinem Nahfuchs 🦊</h2>
+        <p>Dein Spürfuchs für alles gleich um die Ecke – Briefkasten, Paketshop, Container, Toilette, Geldautomat und Ladesäule. Egal, wo du gerade bist.</p>
+        <ul class="ob-badges"><li>Kostenlos</li><li>Ohne Konto</li><li>Ohne Werbung</li></ul>
+      </section>
+      <section class="ob-slide" hidden>
+        <h2>Finden und mithelfen</h2>
+        <ul class="ob-steps">
+          <li><b>Oben antippen,</b> was du suchst – der Fuchs zeigt dir das Nächste.</li>
+          <li><b>Container voll, WC zu?</b> Ort antippen und „Melden“.</li>
+          <li><b>Fehlt ein Ort?</b> Mit <span class="ob-plus">+</span> eintragen.</li>
+        </ul>
+        <p class="ob-sub">Jede Meldung macht die Karte für alle genauer.</p>
+      </section>
+      <section class="ob-slide" hidden>
+        <h2>Sag’s weiter!</h2>
+        <p>Kennst du jemanden, der ständig einen Briefkasten, einen Glascontainer oder ein WC sucht? Empfiehl Nahfuchs weiter – je mehr Füchse mitmachen, desto besser wird die Karte für alle.</p>
+        <button class="btn" id="welcome-share">Nahfuchs weiterempfehlen</button>
+      </section>
+      <div class="ob-foot">
+        <div class="ob-dots" aria-hidden="true"><span class="on"></span><span></span><span></span></div>
+        <button class="link" id="ob-skip">Überspringen</button>
+        <button class="btn primary" id="ob-next">Weiter</button>
+      </div>
     </div>
   </div>
 
