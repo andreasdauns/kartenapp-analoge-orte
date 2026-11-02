@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Naheck – Über die App</title>
-  <meta name="description" content="Naheck: kostenlose Karte für Briefkästen, Paketshops, Container, Toiletten, Geldautomaten und Ladesäulen in ganz Deutschland.">
+  <title>Ecksplorer – Über die App</title>
+  <meta name="description" content="Ecksplorer: kostenlose Karte für Briefkästen, Paketshops, Container, Toiletten, Geldautomaten und Ladesäulen in ganz Deutschland.">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <style>
     :root { --bg:#EEF2EE; --card:#fff; --ink:#15201A; --muted:#5D6B63; --line:#DCE3DD; --accent:#173B2C; --accent2:#2F7A55; }
@@ -34,14 +34,14 @@
   <header>
     <img src="icons/icon.svg" alt="">
     <div>
-      <h1>Naheck</h1>
+      <h1>Ecksplorer</h1>
       <p class="lead">Alles, was du im Alltag um die Ecke suchst – auf einer Karte.</p>
     </div>
   </header>
 
   <section>
     <h2>Was ist das?</h2>
-    <p>Naheck zeigt dir in ganz Deutschland die nächsten <strong>Briefkästen</strong> (mit Leerungszeiten), <strong>Postfilialen, Paketshops und Paketstationen</strong> aller Anbieter, <strong>Glas-, Papier- und Altkleidercontainer</strong>, <strong>öffentliche Toiletten</strong>, <strong>Autobahn-Rastplätze</strong>, <strong>Geldautomaten</strong> und <strong>Ladesäulen</strong> – mit einem Tipp zur Route in Google Maps, Apple Karten oder Waze. Der Knopf „Notdienst“ öffnet die offizielle Apotheken-Notdienstsuche der Apothekerkammern (aponet.de).</p>
+    <p>Ecksplorer zeigt dir in ganz Deutschland die nächsten <strong>Briefkästen</strong> (mit Leerungszeiten), <strong>Postfilialen, Paketshops und Paketstationen</strong> aller Anbieter, <strong>Glas-, Papier- und Altkleidercontainer</strong>, <strong>öffentliche Toiletten</strong>, <strong>Autobahn-Rastplätze</strong>, <strong>Geldautomaten</strong> und <strong>Ladesäulen</strong> – mit einem Tipp zur Route in Google Maps, Apple Karten oder Waze. Der Knopf „Notdienst“ öffnet die offizielle Apotheken-Notdienstsuche der Apothekerkammern (aponet.de).</p>
     <p>Die App ist <strong>kostenlos</strong> und funktioniert <strong>ohne Konto</strong>.</p>
     <a class="btn" href="./">App öffnen</a>
   </section>
@@ -99,7 +99,7 @@
   <section id="kontakt">
     <h2>Kontakt</h2>
     <p>Fragen, Hinweise zu Daten oder Kooperationen: <a id="mail" href="#kontakt">E-Mail anzeigen</a></p>
-    <p class="small">Naheck ist ein privates, nicht-kommerzielles Projekt von Andreas Dauns.</p>
+    <p class="small">Ecksplorer ist ein privates, nicht-kommerzielles Projekt von Andreas Dauns.</p>
   </section>
 </main>
 <script>
@@ -107,7 +107,7 @@
   for (const el of document.querySelectorAll('#mail, .mail')) el.addEventListener('click', (e) => {
     const a = e.currentTarget, m = ['andreas.dauns.apps', 'gmail.com'].join('@');
     if (a.textContent === m) return;
-    e.preventDefault(); a.href = 'mailto:' + m + '?subject=Naheck'; a.textContent = m;
+    e.preventDefault(); a.href = 'mailto:' + m + '?subject=Ecksplorer'; a.textContent = m;
   });
   fetch('data/index.json').then((r) => r.json()).then((d) => {
     const rows = Object.values(d.sources || {}).sort((a, b) => (b.count || 0) - (a.count || 0));
