@@ -211,3 +211,5 @@ body.dragging .fabs, body.dragging .maplibregl-ctrl-bottom-left { transition: no
 .notdienst b { font-size: 15.5px; }
 .notdienst span { font-size: 13.5px; text-decoration: underline; }
 @media (prefers-color-scheme: dark) { .notdienst { background: #3A1A1A; color: #FFC9C9; border-color: #5A2A2A; } }
+.privacy-hint { font-size: 12.5px; color: var(--muted); margin-top: 6px; line-height: 1.35; }
+.ob-legal { font-size: 13px; color: var(--muted); }

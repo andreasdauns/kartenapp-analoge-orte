@@ -637,7 +637,7 @@ function openDetail(it, fly = false) {
         : (!it.src ? `<a class="btn" href="${noteUrl(it)}" target="_blank" rel="noopener">${ICON_FLAG}Korrigieren</a>` : '')}
     </div>
     ${state.nav ? `<div class="navpref">Navigation mit ${esc(NAV[state.nav].name)} · <button id="navchange">ändern</button></div>` : ''}
-    <div class="src">${sourceLine(it, checked)}</div>
+    <div class="src">${sourceLine(it, checked)}${hasUserContent(it) ? ` · <a href="${flagUrl(it)}">Inhalt melden</a>` : ''}</div>
   </div>`;
   $('#close').addEventListener('click', closeDetail);
   $('#navchange')?.addEventListener('click', () => openChooser(null));
@@ -645,6 +645,17 @@ function openDetail(it, fly = false) {
   $('#confirm')?.addEventListener('click', () => submit({ place_id: it.id, category: it.c, kind: 'confirm', lat: it.lat, lon: it.lon }, 'Danke für die Bestätigung!'));
   layoutSheet();
   if (fly) map.easeTo({ center: [it.lon, it.lat], zoom: Math.max(map.getZoom(), 16) });
+}
+// Meldeweg für rechtswidrige oder unzulässige Nutzerinhalte (Art. 16 DSA)
+function hasUserContent(it) {
+  const r = repOf(it);
+  return it.src === 'user' || Boolean(r && (r.notes.length || r.hours || r.closed?.text));
+}
+function flagUrl(it) {
+  const mail = ['andreas.dauns.apps', 'gmail.com'].join('@');
+  const subj = `Inhalt melden – ${titleOf(it)} (${it.id})`;
+  const text = `Ort: ${titleOf(it)} (${it.id}, ${it.lat.toFixed(5)}, ${it.lon.toFixed(5)})\nWelcher Inhalt (Text der Meldung):\n\nWarum ist er unzulässig?\n\nIch versichere, dass meine Angaben nach bestem Wissen richtig und vollständig sind.\nName (optional):`;
+  return `mailto:${mail}?subject=${encodeURIComponent(subj)}&body=${encodeURIComponent(text)}`;
 }
 function sourceLine(it, checked) {
   const S = state.index?.sources || {};
@@ -766,6 +777,7 @@ async function submit(report, thanks = 'Danke! Deine Meldung ist gespeichert.') 
     await R.send(report);
     $('#report').hidden = true;
     toast(thanks);
+    maybeShowSupport();
     const row = { ...report, device: await R.deviceKey(report.place_id), created_at: new Date().toISOString(), expires_at: null };
     if (report.kind === 'status' && R.STATUS_TTL[report.category]) row.expires_at = new Date(Date.now() + R.STATUS_TTL[report.category]).toISOString();
     if (!state.repRows.has(report.place_id)) state.repRows.set(report.place_id, []);
@@ -792,6 +804,7 @@ function openReport(it) {
     </div>
     <div id="report-text" hidden>
       <textarea id="report-msg" rows="3" maxlength="300"></textarea>
+      <div class="privacy-hint">Für alle sichtbar. Bitte keine Namen, Telefonnummern, Kfz-Kennzeichen oder andere persönliche Angaben.</div>
       <button class="btn primary small" id="report-send" style="width:100%;margin-top:8px">Senden</button>
     </div>
     <button class="link" data-close>Abbrechen</button>`;
@@ -831,7 +844,7 @@ function openAdd() {
     <div class="add-sec">Was ist dort?</div>
     <div class="cat-pick">${CATEGORIES.map((c) => `<button class="chip" data-cat="${c.id}" aria-pressed="false" style="--c:${c.color};--k:${c.ink}"><span class="ic">${c.icon}</span>${esc(c.label)}</button>`).join('')}</div>
     <div class="add-row"><input type="text" id="add-name" maxlength="120" placeholder="Name oder Hinweis (optional)"><button class="btn primary" id="add-save">Melden</button></div>
-    <div class="src">Erscheint sofort blass und gilt als bestätigt, sobald ${R.CONFIRM_NEEDED} Personen ihn bestätigt haben.</div>
+    <div class="src">Erscheint sofort blass und gilt als bestätigt, sobald ${R.CONFIRM_NEEDED} Personen ihn bestätigt haben. Für alle sichtbar – bitte keine persönlichen Angaben. Mit dem Melden akzeptierst du die <a href="info.html#nutzung" target="_blank">Nutzungsbedingungen</a>.</div>
   </div>`;
   state.selected = { adding: true };
   body.querySelectorAll('[data-cat]').forEach((b) => b.addEventListener('click', () => {
@@ -894,29 +907,25 @@ async function shareApp() {
 })();
 $('#welcome-share').addEventListener('click', shareApp);
 
-// ---------- Freiwillige Unterstützung (frühestens nach 1 Woche und 3 Nutzungstagen) ----------
-const DAY = 864e5;
-(function supportPrompt() {
-  const now = Date.now();
-  const first = store.get('firstSeen', now);
-  if (first === now) store.set('firstSeen', now);
-  const today = new Date().toISOString().slice(0, 10);
-  const days = store.get('useDays', []);
-  if (!days.includes(today)) { days.push(today); store.set('useDays', days.slice(-30)); }
-  const st = store.get('support', {});
-  const forced = new URLSearchParams(location.search).has('unterstuetzen');
-  const due = !st.never && now >= (st.next || 0) && now - first >= 7 * DAY && days.length >= 3;
-  if (!forced && !due) return;
-  const later = (d) => { store.set('support', { ...store.get('support', {}), next: Date.now() + d * DAY }); $('#support').hidden = true; };
-  $('#support-go').addEventListener('click', () => later(180));
-  $('#support-share').addEventListener('click', () => { later(120); shareApp(); });
-  $('#support-later').addEventListener('click', () => later(60));
-  $('#support-never').addEventListener('click', () => { store.set('support', { never: true }); $('#support').hidden = true; });
+// ---------- Freiwillige Unterstützung ----------
+// Ohne Zähler und ohne Nutzungsprofil: Der Hinweis erscheint höchstens einmal pro App-Sitzung nach einer
+// erfolgreichen Meldung. Gespeichert wird nur, wenn jemand selbst „Nicht mehr anzeigen“ wählt.
+let supportShown = false;
+function maybeShowSupport(force = false) {
+  if (!force && (supportShown || store.get('supportHidden', false))) return;
+  supportShown = true;
   setTimeout(() => {
-    if (document.querySelector('.chooser:not([hidden])')) return; // nicht über andere Fenster legen
+    if (!force && document.querySelector('.chooser:not([hidden])')) return; // nicht über andere Fenster legen
     $('#support').hidden = false;
-  }, forced ? 500 : 25000);
-})();
+  }, force ? 300 : 1800);
+}
+$('#support-go').addEventListener('click', () => { $('#support').hidden = true; });
+$('#support-share').addEventListener('click', () => { $('#support').hidden = true; shareApp(); });
+$('#support-later').addEventListener('click', () => { $('#support').hidden = true; });
+$('#support-never').addEventListener('click', () => { store.set('supportHidden', true); $('#support').hidden = true; });
+if (new URLSearchParams(location.search).has('unterstuetzen')) maybeShowSupport(true);
+// Alte, nicht mehr verwendete Einträge früherer Versionen entfernen
+try { ['firstSeen', 'useDays', 'support'].forEach((k) => localStorage.removeItem(k)); } catch { /* egal */ }
 
 // ---------- Start ----------
 async function init() {
@@ -928,7 +937,7 @@ async function init() {
     state.index = await res.json();
     const extra = Object.entries(state.index.sources || {}).filter(([k]) => k !== 'osm')
       .map(([, v]) => `<a href="${v.url}" target="_blank" rel="noopener">${esc(v.name)}</a> (${esc(v.license)})`);
-    map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '<a href="info.html">Über die App · Datenschutz</a>' + (extra.length ? ' · Weitere Daten: ' + extra.join(', ') : '') }), 'bottom-left');
+    map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '<a href="info.html">Impressum · Datenschutz · Nutzung</a>' + (extra.length ? ' · Weitere Daten: ' + extra.join(', ') : '') }), 'bottom-left');
     setTimeout(() => document.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show'), 1500);
     const g = new Date(state.index.generated);
     body.innerHTML = '<div class="empty">Orte werden geladen …</div>';

@@ -31,6 +31,8 @@
     td, th { text-align:left; padding: 6px 8px 6px 0; border-bottom: 1px solid var(--line); vertical-align: top; }
     th { color: var(--muted); font-weight: 600; }
     .small { font-size: 13px; color: var(--muted); }
+    button.btn { border: 0; font: inherit; font-weight: 650; cursor: pointer; }
+    button.btn:disabled { opacity: .45; cursor: default; }
   </style>
 </head>
 <body>
@@ -57,7 +59,8 @@
 
   <section id="unterstuetzen">
     <h2>Unterstützen</h2>
-    <p>Nahfuchs ist kostenlos, ohne Werbung und ohne Konto – und soll es bleiben. Domain, App-Store-Gebühren und Datenpflege kosten aber Geld. Wenn du magst, kannst du die App freiwillig unterstützen, einmalig oder monatlich: <a href="https://ko-fi.com/nahfuchs" target="_blank" rel="noopener">ko-fi.com/nahfuchs</a>. Genauso hilft es, die App weiterzuempfehlen. Danke!</p>
+    <p>Nahfuchs ist kostenlos, ohne Werbung und ohne Konto – und soll es bleiben. Domain, App-Store-Gebühren und Datenpflege kosten aber Geld. Wenn du magst, kannst du die App mit einem Trinkgeld unterstützen, einmalig oder monatlich: <a href="https://ko-fi.com/nahfuchs" target="_blank" rel="noopener">ko-fi.com/nahfuchs ↗</a> (externe Seite). Genauso hilft es, die App weiterzuempfehlen. Danke!</p>
+    <p class="small">Die Unterstützung ist freiwillig und ohne Gegenleistung. Nahfuchs ist kein gemeinnütziges Projekt; Zahlungen sind daher nicht steuerlich absetzbar, eine Spendenquittung gibt es nicht.</p>
   </section>
 
   <section>
@@ -69,31 +72,64 @@
     <p class="small">Kartendarstellung: <a href="https://openfreemap.org">OpenFreeMap</a>, © OpenMapTiles, Daten © OpenStreetMap-Mitwirkende. Geändert: Daten wurden gefiltert, zusammengeführt und für die Kartenanzeige aufbereitet.</p>
   </section>
 
+  <section id="nutzung">
+    <h2>Nutzungsbedingungen</h2>
+    <h3>Angebot</h3>
+    <p>Nahfuchs ist ein kostenloses Angebot von Andreas Dauns (siehe <a href="#impressum">Impressum</a>). Es besteht kein Anspruch darauf, dass die App jederzeit verfügbar ist; Funktionen können geändert oder eingestellt werden.</p>
+    <h3>Daten ohne Gewähr – bitte vor Ort prüfen</h3>
+    <p>Die Orte stammen aus offenen Datenquellen und aus Meldungen anderer Nutzer. Sie können unvollständig, veraltet oder falsch sein – etwa Leerungs- und Öffnungszeiten oder Angaben zur Barrierefreiheit. Prüfe wichtige Angaben bitte vor Ort oder beim Betreiber. Welche Apotheke Notdienst hat, zeigt ausschließlich die verlinkte offizielle Notdienstsuche.</p>
+    <h3>Regeln für Meldungen</h3>
+    <ul>
+      <li>Melde nur sachliche Angaben zu Orten (z. B. „Container voll“, geänderte Zeiten, neuer Ort).</li>
+      <li>Keine personenbezogenen Angaben über dich oder andere (Namen, Telefonnummern, Kfz-Kennzeichen, Fotos von Personen).</li>
+      <li>Keine Beleidigungen, Werbung, Falschangaben oder sonst rechtswidrigen Inhalte.</li>
+    </ul>
+    <p>Meldungen, die gegen diese Regeln verstoßen, können ohne Vorankündigung gelöscht oder ausgeblendet werden. Wiederholter Missbrauch kann dazu führen, dass Meldungen eines Geräts nicht mehr angenommen werden.</p>
+    <h3>Rechte an Meldungen</h3>
+    <p>Mit dem Absenden erlaubst du, dass deine Meldung in Nahfuchs angezeigt und – wie die übrigen Kartendaten – unter der <a href="https://opendatacommons.org/licenses/odbl/1-0/" rel="noopener">Open Database License (ODbL) 1.0</a> weitergegeben werden darf.</p>
+    <h3>Inhalte melden</h3>
+    <p>Hältst du eine Meldung für rechtswidrig oder unzulässig, tippe beim Ort auf „Inhalt melden“ oder schreibe an <span class="mailtext"></span>. Nenne bitte den Ort, den betreffenden Inhalt und warum er unzulässig ist. Wir prüfen Hinweise zügig und entfernen unzulässige Inhalte.</p>
+    <h3>Haftung</h3>
+    <p>Da das Angebot unentgeltlich ist, haften wir nur für Vorsatz und grobe Fahrlässigkeit. Für Schäden aus der Verletzung von Leben, Körper oder Gesundheit sowie nach dem Produkthaftungsgesetz haften wir nach den gesetzlichen Vorschriften.</p>
+    <p class="small">Es gilt deutsches Recht. Stand: November 2026</p>
+  </section>
+
   <section id="datenschutz">
     <h2>Datenschutz</h2>
-    <p>Kurz gesagt: <strong>Kein Konto, keine Werbe-Tracker, keine Cookies.</strong> Im Einzelnen:</p>
+    <p>Kurz gesagt: <strong>Kein Konto, keine Werbung, kein Tracking, keine Cookies.</strong> Trotzdem fallen beim Nutzen der App einige Daten an. Hier steht genau, welche.</p>
+
     <h3>Verantwortlicher</h3>
-    <p>Andreas Dauns, Am alten Brunnen 31, 53474 Bad Neuenahr-Ahrweiler (Kontakt siehe <a href="#impressum">Impressum</a>).</p>
-    <h3>Hosting</h3>
-    <p>Die App wird über GitHub Pages (GitHub Inc., USA) ausgeliefert. Dabei verarbeitet GitHub technisch notwendig deine IP-Adresse, um die Seite zu übertragen.</p>
-    <h3>Kartenkacheln</h3>
-    <p>Die Hintergrundkarte wird von OpenFreeMap geladen. Dabei wird deine IP-Adresse an diesen Dienst übertragen.</p>
-    <h3>Standort</h3>
-    <p>Wenn du die Standortfreigabe erlaubst, wird dein Standort <strong>nur auf deinem Gerät</strong> verwendet, um die nächsten Orte zu sortieren. Er wird nicht an uns übertragen oder gespeichert.</p>
-    <h3>Meldungen</h3>
-    <p>Wenn du etwas meldest oder einen Ort einträgst, speichern wir die Meldung (Art, Text, Ort auf der Karte, Zeitpunkt) sowie eine zufällig erzeugte Geräte-Kennung, die keinen Rückschluss auf deine Person erlaubt. Sie dient nur dazu, Mehrfachbestätigungen und Spam zu verhindern. Die Daten liegen bei Supabase in einem Rechenzentrum in Frankfurt am Main und sind für alle Nutzer der App sichtbar. Schreibe bitte keine persönlichen Daten in Meldungen.</p>
-    <h3>Einstellungen</h3>
-    <p>Deine Auswahl (z. B. Kategorien, Navi-App) wird nur lokal in deinem Browser gespeichert. Ebenfalls nur lokal merkt sich die App, seit wann und an wie vielen Tagen du sie genutzt hast – damit der Hinweis auf freiwillige Unterstützung frühestens nach einer Woche erscheint. Diese Angaben verlassen dein Gerät nicht.</p>
-    <h3>Navigation</h3>
-    <p>Beim Tippen auf „Route“ öffnet sich Google Maps, Apple Karten oder Waze. Ab dann gelten deren Datenschutzbestimmungen. Dasselbe gilt für den Link zur Apotheken-Notdienstsuche, der aponet.de öffnet.</p>
-    <h3>Unterstützung über Ko-fi</h3>
-    <p>Der Link „Nahfuchs unterstützen“ öffnet die Seite von Ko-fi (Ko-fi Labs Limited, Großbritannien). Erst dann werden Daten an Ko-fi übertragen; für Zahlungen gelten die Datenschutzbestimmungen von Ko-fi und PayPal. In der App selbst ist kein Ko-fi-Baustein eingebunden.</p>
-    <h3>Rechtsgrundlagen und Speicherdauer</h3>
-    <p>Die technisch notwendige Auslieferung der App und der Karte erfolgt auf Grundlage unseres berechtigten Interesses an einem funktionsfähigen Angebot (Art. 6 Abs. 1 lit. f DSGVO). Meldungen speichern wir auf Grundlage deiner freiwilligen Nutzung der Meldefunktion (Art. 6 Abs. 1 lit. a bzw. f DSGVO) für höchstens zwölf Monate; zeitlich begrenzte Zustandsmeldungen (z. B. „Container voll“) werden nach Ablauf nicht mehr angezeigt.</p>
-    <h3>Empfänger und Übermittlung in Drittländer</h3>
-    <p>Daten werden nur an die oben genannten technischen Dienstleister übermittelt. GitHub Inc. hat seinen Sitz in den USA; die Übermittlung erfolgt auf Grundlage des EU-US Data Privacy Framework bzw. von Standardvertragsklauseln. Supabase speichert die Meldungen in der EU (Frankfurt am Main).</p>
-    <h3>Deine Rechte</h3>
-    <p>Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung, Datenübertragbarkeit und Widerspruch (Art. 15–21 DSGVO). Da wir Meldungen nur über eine zufällige Geräte-Kennung zuordnen können, nenne uns für eine Löschung bitte möglichst genau Ort und Zeitpunkt der Meldung. Außerdem kannst du dich bei einer Datenschutz-Aufsichtsbehörde beschweren, z. B. beim Landesbeauftragten für den Datenschutz und die Informationsfreiheit Rheinland-Pfalz.</p>
+    <p>Andreas Dauns, Am alten Brunnen 31, 53474 Bad Neuenahr-Ahrweiler, E-Mail: <span class="mailtext"></span>. Ein Datenschutzbeauftragter ist nicht bestellt, da gesetzlich nicht erforderlich.</p>
+
+    <h3>1. Aufruf der App (Hosting)</h3>
+    <p>Die App wird über GitHub Pages (GitHub Inc., 88 Colin P. Kelly Jr. Street, San Francisco, USA) ausgeliefert. Beim Aufruf verarbeitet GitHub technisch notwendig deine IP-Adresse und Angaben zum Browser und speichert die IP-Adresse laut eigenen Angaben aus Sicherheitsgründen. Rechtsgrundlage: berechtigtes Interesse an einer sicheren und funktionsfähigen Auslieferung (Art. 6 Abs. 1 lit. f DSGVO). Die Übermittlung in die USA stützt sich auf das EU-US Data Privacy Framework (Angemessenheitsbeschluss der EU-Kommission). Details: <a href="https://docs.github.com/de/site-policy/privacy-policies/github-general-privacy-statement" rel="noopener">Datenschutzerklärung von GitHub</a>.</p>
+
+    <h3>2. Hintergrundkarte</h3>
+    <p>Die Kartenbilder werden vom Dienst OpenFreeMap (openfreemap.org) geladen. Dabei wird deine IP-Adresse an diesen Dienst übertragen, weil die Karte sonst nicht angezeigt werden kann (Art. 6 Abs. 1 lit. f DSGVO). Schriften und Programmbibliotheken liegen auf unserem eigenen Server.</p>
+
+    <h3>3. Standort</h3>
+    <p>Wenn du die Standortfreigabe erlaubst, wird dein Standort <strong>nur auf deinem Gerät</strong> verwendet, um die nächsten Orte zu sortieren. Er wird nicht übertragen oder gespeichert. Du kannst die Freigabe jederzeit in deinem Browser bzw. Betriebssystem widerrufen.</p>
+
+    <h3>4. Meldungen</h3>
+    <p>Wenn du etwas meldest oder einen Ort einträgst, speichern wir: Art der Meldung, gewählten Zustand, deinen freiwilligen Text, die Position auf der Karte, den Zeitpunkt und eine zufällige Geräte-Kennung. Die Kennung wird erst bei deiner ersten Meldung erzeugt, enthält keine Angaben über dich und dient nur dazu, Mehrfachbestätigungen und Spam zu verhindern. Andere Nutzer sehen deine Meldung, aber nie die Kennung selbst. Beim Absenden verarbeitet der Datenbank-Dienst technisch bedingt auch deine IP-Adresse.</p>
+    <p>Die Meldungen speichert Supabase für uns in einem Rechenzentrum in Frankfurt am Main (Auftragsverarbeitung nach Art. 28 DSGVO; Vertragspartner ist Supabase mit Sitz außerhalb der EU, abgesichert durch EU-Standardvertragsklauseln). Rechtsgrundlage ist unser berechtigtes Interesse, eine aktuelle, gemeinsam gepflegte Karte anzubieten (Art. 6 Abs. 1 lit. f DSGVO). Meldungen werden nach spätestens zwölf Monaten gelöscht; Zustandsmeldungen wie „Container voll“ werden schon nach 12–48 Stunden nicht mehr angezeigt. Bitte schreibe keine persönlichen Angaben in Meldungen.</p>
+
+    <h3>5. Speicherung auf deinem Gerät</h3>
+    <p>Die App speichert im lokalen Speicher deines Browsers nur, was für die von dir genutzten Funktionen nötig ist: deine gewählten Kategorien und Paketdienste, die bevorzugte Navi-App, den zuletzt gezeigten Kartenausschnitt, dass du die Begrüßung gesehen hast, ggf. die Geräte-Kennung für Meldungen (siehe 4) und – nur wenn du das selbst wählst – dass der Unterstützungs-Hinweis nicht mehr erscheinen soll. Diese Angaben verlassen dein Gerät nicht (außer der Kennung beim Melden) und sind für die gewünschten Funktionen unbedingt erforderlich (§ 25 Abs. 2 Nr. 2 TDDDG). Du kannst sie jederzeit löschen, indem du die Website-Daten im Browser löschst.</p>
+
+    <h3>6. Externe Links</h3>
+    <p>Beim Tippen auf „Route“ öffnet sich Google Maps, Apple Karten oder Waze, beim Apotheken-Notdienst die Seite aponet.de. Erst dann werden Daten an diese Anbieter übertragen; es gelten deren Datenschutzbestimmungen.</p>
+
+    <h3>7. Unterstützung über Ko-fi</h3>
+    <p>Der Link „Nahfuchs unterstützen“ öffnet die externe Seite von Ko-fi (Ko-fi Labs Limited, Großbritannien). In der App ist kein Ko-fi-Baustein eingebunden. Wenn du ein Trinkgeld gibst, verarbeiten Ko-fi und PayPal deine Zahlungsdaten in eigener Verantwortung. Wir erhalten dabei deinen Namen bzw. Anzeigenamen, deine E-Mail-Adresse, den Betrag und deine freiwillige Nachricht. Diese Angaben nutzen wir nur zur Abwicklung und Buchhaltung und bewahren sie wegen steuerrechtlicher Pflichten bis zu acht Jahre auf (Art. 6 Abs. 1 lit. b und c DSGVO, § 147 AO). Für Großbritannien besteht ein Angemessenheitsbeschluss der EU-Kommission.</p>
+
+    <h3>8. Kontakt per E-Mail</h3>
+    <p>Wenn du uns schreibst, verwenden wir deine Angaben nur zur Bearbeitung deiner Anfrage (Art. 6 Abs. 1 lit. f DSGVO) und löschen sie, wenn sie nicht mehr benötigt werden. Das Postfach wird bei Google (Gmail) geführt.</p>
+
+    <h3>9. Deine Rechte</h3>
+    <p>Du hast das Recht auf Auskunft, Berichtigung, Löschung, Einschränkung der Verarbeitung und Datenübertragbarkeit (Art. 15–20 DSGVO). <strong>Du kannst der Verarbeitung, die auf berechtigtem Interesse beruht, jederzeit widersprechen (Art. 21 DSGVO).</strong> Da wir dich nicht kennen, können wir Meldungen nur über die Geräte-Kennung zuordnen. Am einfachsten löschst du deine Meldungen selbst:</p>
+    <p><button id="delete-mine" class="btn" type="button">Meine Meldungen löschen</button> <span id="delete-info" class="small"></span></p>
+    <p>Außerdem kannst du dich bei einer Datenschutz-Aufsichtsbehörde beschweren, zum Beispiel beim Landesbeauftragten für den Datenschutz und die Informationsfreiheit Rheinland-Pfalz, Hintere Bleiche 34, 55116 Mainz.</p>
     <p class="small">Stand: November 2026</p>
   </section>
 
@@ -103,23 +139,37 @@
     Andreas Dauns<br>
     Am alten Brunnen 31<br>
     53474 Bad Neuenahr-Ahrweiler<br>
-    E-Mail: <a class="mail" href="#impressum">anzeigen</a></p>
-    <p class="small">Verantwortlich für den Inhalt: Andreas Dauns (Anschrift wie oben). Hinweise zu fehlerhaften Orten bitte direkt in der App melden.</p>
+    E-Mail: <span class="mailtext"></span></p>
+    <p class="small">Zentrale Kontaktstelle nach Art. 11 und 12 des Gesetzes über digitale Dienste (DSA) für Behörden und Nutzer: E-Mail wie oben, Sprachen: Deutsch, Englisch.</p>
+    <p class="small">Hinweise zu fehlerhaften Orten bitte direkt in der App melden.</p>
   </section>
 
   <section id="kontakt">
     <h2>Kontakt</h2>
-    <p>Fragen, Hinweise zu Daten oder Kooperationen: <a id="mail" href="#kontakt">E-Mail anzeigen</a></p>
+    <p>Fragen, Hinweise zu Daten oder Kooperationen: <span class="mailtext"></span></p>
     <p class="small">Der Quellcode ist offen unter der Lizenz <a href="https://www.gnu.org/licenses/agpl-3.0.de.html" rel="noopener">GNU AGPL 3.0</a>: <a href="https://github.com/andreasdauns/kartenapp-analoge-orte" rel="noopener">github.com/andreasdauns/kartenapp-analoge-orte</a>. Name und Logo „Nahfuchs“ sind davon ausgenommen.</p>
-    <p class="small">Nahfuchs ist ein privates, nicht-kommerzielles Projekt von Andreas Dauns.</p>
   </section>
 </main>
 <script>
-  // E-Mail-Adresse erst beim Klick zusammensetzen (Schutz vor Spam-Bots)
-  for (const el of document.querySelectorAll('#mail, .mail')) el.addEventListener('click', (e) => {
-    const a = e.currentTarget, m = ['andreas.dauns.apps', 'gmail.com'].join('@');
-    if (a.textContent === m) return;
-    e.preventDefault(); a.href = 'mailto:' + m + '?subject=Nahfuchs'; a.textContent = m;
+  // E-Mail-Adresse: im Quelltext getrennt (gegen Spam-Bots), auf der Seite direkt sichtbar und anklickbar
+  const MAIL = ['andreas.dauns.apps', 'gmail.com'].join('@');
+  for (const el of document.querySelectorAll('.mailtext')) el.innerHTML = `<a href="mailto:${MAIL}?subject=Nahfuchs">${MAIL}</a>`;
+  // Eigene Meldungen löschen (Geräte-Kennung aus dem lokalen Speicher)
+  import('./src/config.js').then(({ SUPABASE }) => {
+    const btn = document.getElementById('delete-mine'), info = document.getElementById('delete-info');
+    let dev = null; try { dev = localStorage.getItem('device'); } catch { /* egal */ }
+    if (!dev) { btn.disabled = true; info.textContent = 'Von diesem Gerät gibt es keine Meldungen.'; return; }
+    btn.addEventListener('click', async () => {
+      if (!confirm('Alle Meldungen von diesem Gerät endgültig löschen?')) return;
+      btn.disabled = true; info.textContent = 'Wird gelöscht …';
+      try {
+        const r = await fetch(`${SUPABASE.url}/rest/v1/rpc/delete_my_reports`, { method: 'POST', headers: { apikey: SUPABASE.key, Authorization: `Bearer ${SUPABASE.key}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ dev }) });
+        if (!r.ok) throw new Error(r.status);
+        const n = await r.json();
+        try { localStorage.removeItem('device'); } catch { /* egal */ }
+        info.textContent = `Erledigt: ${n} Meldung(en) gelöscht.`;
+      } catch { btn.disabled = false; info.textContent = 'Das hat nicht geklappt. Bitte schreib uns eine E-Mail.'; }
+    });
   });
   fetch('data/index.json').then((r) => r.json()).then((d) => {
     const rows = Object.values(d.sources || {}).sort((a, b) => (b.count || 0) - (a.count || 0));
