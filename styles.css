@@ -1,11 +1,16 @@
+@font-face { font-family: "Outfit"; font-style: normal; font-weight: 400; font-display: swap; src: url("vendor/fonts/outfit-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Outfit"; font-style: normal; font-weight: 600; font-display: swap; src: url("vendor/fonts/outfit-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Outfit"; font-style: normal; font-weight: 800; font-display: swap; src: url("vendor/fonts/outfit-latin-800-normal.woff2") format("woff2"); }
 :root {
-  --bg: #EEF2EE;
+  --bg: #EEF3EC;
   --card: #FFFFFF;
-  --ink: #15201A;
-  --muted: #5D6B63;
-  --line: #DCE3DD;
-  --accent: #173B2C;
-  --accent-2: #2F7A55;
+  --ink: #17241D;
+  --muted: #4E6157;
+  --line: #D5DED7;
+  --accent: #1F4D3A;
+  --accent-2: #2E6B4A;
+  --fox: #E8742A;
+  --fox-ink: #17241D;
   --ok: #1F7A45;
   --ok-bg: #E3F3E8;
   --warn: #8A5A00;
@@ -16,13 +21,13 @@
   --shadow: 0 6px 24px rgba(16, 32, 24, .14), 0 1px 3px rgba(16, 32, 24, .10);
   --safe-top: env(safe-area-inset-top, 0px);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-family: "Outfit", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color: var(--ink);
 }
 @media (prefers-color-scheme: dark) {
   :root {
     --bg: #101713; --card: #18221C; --ink: #E7EEE9; --muted: #9AA9A0; --line: #2A3830;
-    --accent: #8FD3AE; --accent-2: #8FD3AE;
+    --accent: #8FD3AE; --accent-2: #8FD3AE; --fox: #F08A3C; --fox-ink: #17241D;
     --ok: #8FE0AE; --ok-bg: #1D3526; --warn: #F2C46B; --warn-bg: #3A2F14; --bad: #F2A0A4; --bad-bg: #3A1D1F;
   }
 }
@@ -55,6 +60,7 @@ body.dragging .fabs, body.dragging .maplibregl-ctrl-bottom-left { transition: no
 .fab { width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--card); box-shadow: var(--shadow); display: grid; place-items: center; color: var(--accent); }
 .fab svg { width: 24px; height: 24px; }
 .fab.active { background: var(--accent); color: var(--card); }
+#btn-add { background: var(--fox); color: var(--fox-ink); }
 .fab-pill { width: auto; height: 36px; border-radius: 18px; padding: 0 12px 0 10px; display: flex; align-items: center; gap: 6px; align-self: flex-end; color: #C62828; text-decoration: none; font-size: 13px; font-weight: 600; }
 .fab-pill svg { width: 16px; height: 16px; }
 
