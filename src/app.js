@@ -861,6 +861,30 @@ if (!store.get('welcomed', false)) $('#welcome').hidden = false;
 $('#welcome-go').addEventListener('click', () => { $('#welcome').hidden = true; store.set('welcomed', true); });
 $('#welcome-share').addEventListener('click', shareApp);
 
+// ---------- Freiwillige Unterstützung (frühestens nach 1 Woche und 3 Nutzungstagen) ----------
+const DAY = 864e5;
+(function supportPrompt() {
+  const now = Date.now();
+  const first = store.get('firstSeen', now);
+  if (first === now) store.set('firstSeen', now);
+  const today = new Date().toISOString().slice(0, 10);
+  const days = store.get('useDays', []);
+  if (!days.includes(today)) { days.push(today); store.set('useDays', days.slice(-30)); }
+  const st = store.get('support', {});
+  const forced = new URLSearchParams(location.search).has('unterstuetzen');
+  const due = !st.never && now >= (st.next || 0) && now - first >= 7 * DAY && days.length >= 3;
+  if (!forced && !due) return;
+  const later = (d) => { store.set('support', { ...store.get('support', {}), next: Date.now() + d * DAY }); $('#support').hidden = true; };
+  $('#support-go').addEventListener('click', () => later(180));
+  $('#support-share').addEventListener('click', () => { later(120); shareApp(); });
+  $('#support-later').addEventListener('click', () => later(60));
+  $('#support-never').addEventListener('click', () => { store.set('support', { never: true }); $('#support').hidden = true; });
+  setTimeout(() => {
+    if (document.querySelector('.chooser:not([hidden])')) return; // nicht über andere Fenster legen
+    $('#support').hidden = false;
+  }, forced ? 500 : 25000);
+})();
+
 // ---------- Start ----------
 async function init() {
   renderChips();
