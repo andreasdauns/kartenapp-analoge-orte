@@ -850,7 +850,7 @@ if (R.enabled()) {
 // ---------- Begrüßung beim ersten Start ----------
 async function shareApp() {
   const url = location.origin + location.pathname;
-  const data = { title: 'Ecksplorer', text: 'Briefkästen, Paketshops, Container, Toiletten & mehr um die Ecke – kostenlos:', url };
+  const data = { title: 'Nahfuchs', text: 'Briefkästen, Paketshops, Container, Toiletten & mehr um die Ecke – kostenlos:', url };
   try {
     if (navigator.share) { await navigator.share(data); return; }
     await navigator.clipboard.writeText(url);
