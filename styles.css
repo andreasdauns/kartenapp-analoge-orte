@@ -55,6 +55,8 @@ body.dragging .fabs, body.dragging .maplibregl-ctrl-bottom-left { transition: no
 .fab { width: 48px; height: 48px; border-radius: 50%; border: 0; background: var(--card); box-shadow: var(--shadow); display: grid; place-items: center; color: var(--accent); }
 .fab svg { width: 24px; height: 24px; }
 .fab.active { background: var(--accent); color: var(--card); }
+.fab-pill { width: auto; height: 36px; border-radius: 18px; padding: 0 12px 0 10px; display: flex; align-items: center; gap: 6px; align-self: flex-end; color: #C62828; text-decoration: none; font-size: 13px; font-weight: 600; }
+.fab-pill svg { width: 16px; height: 16px; }
 
 /* Unteres Blatt (ziehbar) */
 .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; height: var(--sheet-max, 74vh); background: var(--card); border-radius: 20px 20px 0 0; box-shadow: 0 -6px 24px rgba(16,32,24,.16); padding: 0 16px; display: flex; flex-direction: column; transform: translateY(calc(var(--sheet-max, 74vh) - var(--sheet-h, 150px))); transition: transform .28s cubic-bezier(.2,.8,.2,1); will-change: transform; touch-action: none; }

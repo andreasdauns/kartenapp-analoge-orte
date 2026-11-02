@@ -3,14 +3,14 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
-  <title>Around the Corner</title>
-  <meta name="description" content="Around the Corner: Briefkästen, Container, Toiletten, Paketstationen und mehr auf einer Karte – mit Leerungs- und Öffnungszeiten.">
+  <title>Naheck – Briefkasten, Container &amp; WC in der Nähe</title>
+  <meta name="description" content="Naheck: Briefkästen, Container, Toiletten, Paketstationen und mehr auf einer Karte – mit Leerungs- und Öffnungszeiten.">
   <meta name="theme-color" content="#173B2C">
   <link rel="manifest" href="manifest.webmanifest">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <link rel="apple-touch-icon" href="icons/icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-title" content="Around the Corner">
+  <meta name="apple-mobile-web-app-title" content="Naheck">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="vendor/maplibre-gl.css">
   <link rel="stylesheet" href="styles.css">
@@ -28,6 +28,9 @@
   <div class="zoomhint" id="zoomhint" hidden>Zum Anzeigen der Orte näher heranzoomen</div>
 
   <div class="fabs">
+    <a class="fab fab-pill" id="btn-notdienst" href="https://www.aponet.de/notdienstsuche" target="_blank" rel="noopener" aria-label="Apotheken-Notdienst in der Nähe finden (aponet.de)">
+      <svg viewBox="0 0 24 24" fill="currentColor"><path d="M9.5 3h5v6.5H21v5h-6.5V21h-5v-6.5H3v-5h6.5z"/></svg><span>Notdienst</span>
+    </a>
     <button class="fab" id="btn-add" aria-label="Neuen Ort melden" hidden>
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
     </button>
@@ -55,7 +58,7 @@
   <div class="chooser welcome" id="welcome" hidden>
     <div class="chooser-card" role="dialog" aria-modal="true" aria-labelledby="welcome-h">
       <img src="icons/icon.svg" alt="" class="welcome-logo">
-      <h2 id="welcome-h">Willkommen bei Around the Corner</h2>
+      <h2 id="welcome-h">Willkommen bei Naheck</h2>
       <p>Briefkästen, Paketshops, Container, Toiletten, Geldautomaten und Ladesäulen – alles, was du im Alltag um die Ecke suchst, auf einer Karte.</p>
       <p><strong>Die App ist kostenlos und du brauchst kein Konto.</strong></p>
       <p>Sie lebt vom Miteinander: Wenn du meldest, dass ein Container voll ist, eine Toilette geschlossen hat oder irgendwo ein neuer Briefkasten steht, hilfst du allen anderen. Jede Meldung macht die Karte genauer – und so kann die App kostenlos und frei verfügbar bleiben.</p>

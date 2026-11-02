@@ -3,8 +3,8 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Around the Corner – Über die App</title>
-  <meta name="description" content="Around the Corner: kostenlose Karte für Briefkästen, Paketshops, Container, Toiletten, Geldautomaten und Ladesäulen in ganz Deutschland.">
+  <title>Naheck – Über die App</title>
+  <meta name="description" content="Naheck: kostenlose Karte für Briefkästen, Paketshops, Container, Toiletten, Geldautomaten und Ladesäulen in ganz Deutschland.">
   <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
   <style>
     :root { --bg:#EEF2EE; --card:#fff; --ink:#15201A; --muted:#5D6B63; --line:#DCE3DD; --accent:#173B2C; --accent2:#2F7A55; }
@@ -34,14 +34,14 @@
   <header>
     <img src="icons/icon.svg" alt="">
     <div>
-      <h1>Around the Corner</h1>
+      <h1>Naheck</h1>
       <p class="lead">Alles, was du im Alltag um die Ecke suchst – auf einer Karte.</p>
     </div>
   </header>
 
   <section>
     <h2>Was ist das?</h2>
-    <p>Around the Corner zeigt dir in ganz Deutschland die nächsten <strong>Briefkästen</strong> (mit Leerungszeiten), <strong>Postfilialen, Paketshops und Paketstationen</strong> aller Anbieter, <strong>Glas-, Papier- und Altkleidercontainer</strong>, <strong>öffentliche Toiletten</strong>, <strong>Autobahn-Rastplätze</strong>, <strong>Geldautomaten</strong> und <strong>Ladesäulen</strong> – mit einem Tipp zur Route in Google Maps, Apple Karten oder Waze.</p>
+    <p>Naheck zeigt dir in ganz Deutschland die nächsten <strong>Briefkästen</strong> (mit Leerungszeiten), <strong>Postfilialen, Paketshops und Paketstationen</strong> aller Anbieter, <strong>Glas-, Papier- und Altkleidercontainer</strong>, <strong>öffentliche Toiletten</strong>, <strong>Autobahn-Rastplätze</strong>, <strong>Geldautomaten</strong> und <strong>Ladesäulen</strong> – mit einem Tipp zur Route in Google Maps, Apple Karten oder Waze. Der Knopf „Notdienst“ öffnet die offizielle Apotheken-Notdienstsuche der Apothekerkammern (aponet.de).</p>
     <p>Die App ist <strong>kostenlos</strong> und funktioniert <strong>ohne Konto</strong>.</p>
     <a class="btn" href="./">App öffnen</a>
   </section>
@@ -76,7 +76,7 @@
     <h3>Einstellungen</h3>
     <p>Deine Auswahl (z. B. Kategorien, Navi-App) wird nur lokal in deinem Browser gespeichert.</p>
     <h3>Navigation</h3>
-    <p>Beim Tippen auf „Route“ öffnet sich Google Maps, Apple Karten oder Waze. Ab dann gelten deren Datenschutzbestimmungen.</p>
+    <p>Beim Tippen auf „Route“ öffnet sich Google Maps, Apple Karten oder Waze. Ab dann gelten deren Datenschutzbestimmungen. Dasselbe gilt für den Knopf „Notdienst“, der aponet.de öffnet.</p>
     <h3>Rechtsgrundlagen und Speicherdauer</h3>
     <p>Die technisch notwendige Auslieferung der App und der Karte erfolgt auf Grundlage unseres berechtigten Interesses an einem funktionsfähigen Angebot (Art. 6 Abs. 1 lit. f DSGVO). Meldungen speichern wir auf Grundlage deiner freiwilligen Nutzung der Meldefunktion (Art. 6 Abs. 1 lit. a bzw. f DSGVO) für höchstens zwölf Monate; zeitlich begrenzte Zustandsmeldungen (z. B. „Container voll“) werden nach Ablauf nicht mehr angezeigt.</p>
     <h3>Empfänger und Übermittlung in Drittländer</h3>
@@ -99,7 +99,7 @@
   <section id="kontakt">
     <h2>Kontakt</h2>
     <p>Fragen, Hinweise zu Daten oder Kooperationen: <a id="mail" href="#kontakt">E-Mail anzeigen</a></p>
-    <p class="small">Around the Corner ist ein privates, nicht-kommerzielles Projekt von Andreas Dauns.</p>
+    <p class="small">Naheck ist ein privates, nicht-kommerzielles Projekt von Andreas Dauns.</p>
   </section>
 </main>
 <script>
@@ -107,7 +107,7 @@
   for (const el of document.querySelectorAll('#mail, .mail')) el.addEventListener('click', (e) => {
     const a = e.currentTarget, m = ['andreas.dauns', 'gmail.com'].join('@');
     if (a.textContent === m) return;
-    e.preventDefault(); a.href = 'mailto:' + m + '?subject=Around%20the%20Corner'; a.textContent = m;
+    e.preventDefault(); a.href = 'mailto:' + m + '?subject=Naheck'; a.textContent = m;
   });
   fetch('data/index.json').then((r) => r.json()).then((d) => {
     const rows = Object.values(d.sources || {}).sort((a, b) => (b.count || 0) - (a.count || 0));
