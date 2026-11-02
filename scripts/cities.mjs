@@ -4,7 +4,7 @@
 import { readFile } from 'node:fs/promises';
 import { parcelInfo } from '../src/categories.js';
 
-const UA = { 'User-Agent': 'around-the-corner/1.0 (https://github.com/andreasdauns/kartenapp-analoge-orte)' };
+const UA = { 'User-Agent': 'nahfuchs/1.0 (https://nahfuchs.de)' };
 const get = async (url, type = 'json') => {
   const res = await fetch(url, { headers: UA, signal: AbortSignal.timeout(120000) });
   if (!res.ok) throw new Error(`HTTP ${res.status}`);

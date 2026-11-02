@@ -2,7 +2,7 @@
 // Jede Quelle liefert Orte im gleichen Format wie build-data.mjs: {id, c, lat, lon, t, src}.
 // Fällt eine Quelle aus, wird sie übersprungen (die App läuft mit den übrigen Daten weiter).
 
-const UA = { 'User-Agent': 'around-the-corner/1.0 (https://github.com/andreasdauns/kartenapp-analoge-orte)' };
+const UA = { 'User-Agent': 'nahfuchs/1.0 (https://nahfuchs.de)' };
 const get = async (url, type = 'json') => {
   const res = await fetch(url, { headers: UA, signal: AbortSignal.timeout(180000) });
   if (!res.ok) throw new Error(`${url} -> HTTP ${res.status}`);
