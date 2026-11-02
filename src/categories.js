@@ -27,6 +27,11 @@ export const CATEGORIES = [
     icon: svg('<path d="M8.5 3L3 6.5l2.2 3.8L7 9.4V21h10V9.4l1.8.9L21 6.5 15.5 3c-.6 1.5-1.9 2.5-3.5 2.5S9.1 4.5 8.5 3z"/>'),
   },
   {
+    id: 'wertstoffhof', label: 'Wertstoffhof', plural: 'Wertstoffhöfe & Grünschnitt',
+    color: '#5E7F1A', ink: '#FFFFFF',
+    icon: svg('<path d="M5 20c0-8.5 5.5-14.5 15-15.5-.8 10-6.5 15.5-15 15.5z"/><path d="M5 20l8.5-8.5"/>'),
+  },
+  {
     id: 'toilette', label: 'Toilette', plural: 'Öffentliche Toiletten',
     color: '#0A8FA6', ink: '#FFFFFF',
     icon: txt('WC', 10),
@@ -73,6 +78,9 @@ export function classify(tags = {}) {
     if (yes(tags['recycling:paper']) || yes(tags['recycling:cardboard']) || yes(tags['recycling:newspaper'])) out.push('papier');
     if (yes(tags['recycling:clothes']) || yes(tags['recycling:shoes'])) out.push('altkleider');
   }
+  // Wertstoffhöfe, Grünschnitt-/Kompostannahme, Umladestationen mit Bürgerannahme
+  const green = yes(tags['recycling:green_waste']) || yes(tags['recycling:garden_waste']);
+  if (!noAccess && ((a === 'recycling' && (tags.recycling_type === 'centre' || green)) || a === 'waste_transfer_station')) out.push('wertstoffhof');
   if (a === 'toilets' && !noAccess) out.push('toilette');
   if (tags.highway === 'rest_area' || tags.highway === 'services') out.push('rastplatz');
   const locker = a === 'parcel_locker' || (a === 'vending_machine' && /parcel/.test(tags.vending || ''));

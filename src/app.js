@@ -87,6 +87,12 @@ function titleOf(it) {
     case 'briefkasten': return 'Briefkasten';
     case 'toilette': return t.name && !/^(wc|toilette)$/i.test(t.name) ? t.name : 'Öffentliche Toilette';
     case 'rastplatz': return t.name || 'Rastplatz';
+    case 'wertstoffhof': {
+      if (t.name && !/^(wertstoffhof|recyclinghof)$/i.test(t.name)) return t.name;
+      const green = t['recycling:green_waste'] === 'yes' || t['recycling:garden_waste'] === 'yes';
+      if (t.recycling_type !== 'centre' && t.amenity === 'recycling' && green) return 'Grünschnitt-Sammelstelle';
+      return t.amenity === 'waste_transfer_station' ? 'Abfall-Annahmestelle' : 'Wertstoffhof';
+    }
     default: return CATEGORY_BY_ID[it.c].label;
   }
 }
@@ -99,6 +105,7 @@ function subOf(it) {
     if (it.c === 'paketshop' && t.name && !/paket|post|hermes|dpd|gls|ups/i.test(t.name)) parts.push(t.name);
     parts.push((it.pv || []).map((p) => PROV[p]?.label).filter(Boolean).join(', '));
   }
+  if (it.c === 'wertstoffhof') parts.push(t.operator);
   if (it.c === 'ladesaeule') {
     const kw = Math.max(0, ...Object.keys(t).filter((k) => /^socket:.+:output$/.test(k)).map((k) => parseFloat(t[k]) || 0));
     parts.push([t.operator || t.brand, kw ? `${kw} kW` : null].filter(Boolean).join(' · '));
@@ -147,6 +154,11 @@ const MATERIAL = {
   glass_bottles: 'Glasflaschen', glass: 'Glas', paper: 'Papier', cardboard: 'Pappe', newspaper: 'Zeitungen',
   clothes: 'Kleidung', shoes: 'Schuhe', plastic_packaging: 'Verpackungen', cans: 'Dosen', batteries: 'Batterien',
   small_appliances: 'Elektro-Kleingeräte', books: 'Bücher', cooking_oil: 'Speiseöl', green_waste: 'Grünschnitt',
+  garden_waste: 'Gartenabfälle', organic: 'Bioabfall', wood: 'Holz', scrap_metal: 'Metallschrott', metal: 'Metall',
+  electrical_appliances: 'Elektrogeräte', electrical_items: 'Elektrogeräte', hazardous_waste: 'Schadstoffe',
+  bulky_waste: 'Sperrmüll', furniture: 'Möbel', mattresses: 'Matratzen', tyres: 'Reifen', polystyrene: 'Styropor',
+  plastic: 'Kunststoff', waste: 'Restmüll', paint: 'Farben', fluorescent_tubes: 'Leuchtstoffröhren', cds: 'CDs',
+  engine_oil: 'Altöl', car_batteries: 'Autobatterien', rubble: 'Bauschutt', soil: 'Erde', christmas_trees: 'Weihnachtsbäume',
 };
 const SOCKET = { type2: 'Typ 2', type2_combo: 'CCS', chademo: 'CHAdeMO', schuko: 'Schuko', type2_cable: 'Typ 2 (Kabel)', tesla_supercharger: 'Tesla', type1: 'Typ 1' };
 
@@ -163,6 +175,13 @@ function factsOf(it) {
     add('Annahme', mats.join(', '));
     add('Art', t.recycling_type === 'centre' ? 'Wertstoffhof' : 'Container');
     add('Einwurfzeiten', weekSummary(parseHours(t.opening_hours)) || t.opening_hours);
+  }
+  if (it.c === 'wertstoffhof') {
+    const mats = Object.keys(t).filter((k) => /^recycling:[a-z_]+$/.test(k) && t[k] === 'yes').map((k) => MATERIAL[k.slice(10)] || k.slice(10).replace(/_/g, ' '));
+    add('Öffnungszeiten', weekSummary(parseHours(t.opening_hours)) || t.opening_hours || 'unbekannt – vorher beim Betreiber prüfen');
+    add('Annahme', mats.join(', '));
+    add('Betreiber', t.operator);
+    add('Gebühr', t.fee === 'no' ? 'kostenlos' : t.fee === 'yes' ? (t.charge || 'ja') : null);
   }
   if (it.c === 'toilette') {
     add('Öffnungszeiten', weekSummary(parseHours(t.opening_hours)) || t.opening_hours);
