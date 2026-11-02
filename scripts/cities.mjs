@@ -126,7 +126,7 @@ function gmlFeatures(xml, zone = 33) {
     if (!pos) continue;
     const desc = /<gml:description>([^<]*)</.exec(m)?.[1];
     const name = /<gml:name>([^<]*)</.exec(m)?.[1];
-    const times = /<gmd:LocalisedCharacterString>([^<]*)</.exec(m)?.[1];
+    const times = /<gmd:LocalisedCharacterString[^>]*>([^<]*)</.exec(m)?.[1];
     feats.push({ geometry: { type: 'Point', coordinates: [+pos[1], +pos[2]], zone }, properties: { description: desc, name, times } });
   }
   return { features: feats };
