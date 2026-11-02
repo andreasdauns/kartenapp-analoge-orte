@@ -1,5 +1,5 @@
 // Service Worker: App offline startfähig, Daten immer zuerst frisch aus dem Netz.
-const VERSION = 'v30';
+const VERSION = 'v31';
 const SHELL = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'src/app.js', 'src/categories.js', 'src/hours.js', 'src/reports.js', 'src/config.js',
