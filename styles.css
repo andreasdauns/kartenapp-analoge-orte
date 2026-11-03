@@ -231,6 +231,8 @@ body.dragging .fabs, body.dragging .maplibregl-ctrl-bottom-left { transition: no
 .ob-legal { font-size: 13px; color: var(--muted); }
 
 /* Wünsche & Rückmeldungen */
+.chip.wishchip { padding: 0 14px; border-style: dashed; color: var(--muted); font-weight: 600; }
+.wish-link { display: block; margin: 14px auto 4px; border: 0; background: none; color: var(--accent-2); font-weight: 600; font-size: 13.5px; }
 .wish-card { max-height: calc(100vh - 32px); overflow-y: auto; }
 .wish-sec { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; margin-top: 6px; }
 .wish-chips { display: flex; flex-wrap: wrap; gap: 6px; }

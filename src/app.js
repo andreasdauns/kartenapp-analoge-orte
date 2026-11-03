@@ -320,7 +320,7 @@ function renderChips() {
   $('#chips').innerHTML = CATEGORIES.map((c) => `
     <button class="chip" data-id="${c.id}" aria-pressed="${state.active.has(c.id)}" style="--c:${c.color};--k:${c.ink}">
       <span class="ic">${c.icon}</span>${esc(c.plural)}
-    </button>`).join('');
+    </button>`).join('') + '<button class="chip wishchip" data-wish="1">Fehlt was?</button>';
 }
 function renderProviders() {
   const show = PARCEL.some((c) => state.active.has(c));
@@ -663,6 +663,7 @@ function notdienstHint() {
   if (!state.active.has('apotheke')) return '';
   return `<a class="notdienst" href="${NOTDIENST_URL}" target="_blank" rel="noopener"><b>Welche Apotheke hat jetzt Notdienst?</b><span>Offizielle Notdienstsuche der Apothekerkammern öffnen ↗</span></a>`;
 }
+const wishLink = () => '<button class="link wish-link" data-wish="1">Fehlt dir was in der App? Sag’s uns</button>';
 function renderList() {
   if (!state.index) return;
   const ref = refPoint();
@@ -689,7 +690,8 @@ function renderList() {
     ${list.length ? list.map((x) => rowHtml(x.it, ref)).join('') : `<div class="empty">${esc(empty)}</div>`}
     ${list.length > PEEK_ROWS && state.mode === 'peek' ? '<div class="hint">Nach oben ziehen für mehr</div>' : ''}
     ${providerHint()}
-    ${cardHint()}`;
+    ${cardHint()}
+    ${wishLink()}`;
   layoutSheet();
 }
 body.addEventListener('click', (e) => {
@@ -978,7 +980,7 @@ if (new URLSearchParams(location.search).has('unterstuetzen')) maybeShowSupport(
 try { ['firstSeen', 'useDays', 'support'].forEach((k) => localStorage.removeItem(k)); } catch { /* egal */ }
 
 // ---------- Wünsche & Rückmeldungen ----------
-// Kein Pop-up: Das Fenster öffnet sich nur, wenn jemand selbst auf den Sprechblasen-Knopf tippt.
+// Kein Pop-up: Das Fenster öffnet sich nur, wenn jemand selbst auf „Fehlt was?“ (Ende der Kategorie-Leiste oder Ende der Liste) tippt.
 // Gesendet werden nur die angetippten Punkte (feste Liste) – ohne Geräte-ID, ohne Freitext.
 const WISH_CATS = [
   ['aed', 'Defibrillatoren (AED)'], ['trinkwasser', 'Trinkbrunnen'], ['buecher', 'Bücherschränke'],
