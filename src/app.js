@@ -14,6 +14,7 @@ const DE_BOUNDS = [[5.87, 47.27], [15.04, 55.06]];
 const $ = (s) => document.querySelector(s);
 /** Nur https-Links aus Datenquellen zulassen (Schutz vor manipulierten Links). */
 const safeUrl = (u) => { try { const x = new URL(u); return x.protocol === 'https:' ? esc(x.href) : '#'; } catch { return '#'; } };
+const CONTACT_MAIL = ['andreas.dauns.apps', 'gmail.com'].join('@');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
@@ -528,7 +529,12 @@ function setMe(pos) {
   state.me = { lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy };
   map.getSource('me')?.setData(fc([pointF(state.me.lon, state.me.lat)]));
   $('#btn-locate').classList.add('active');
-  if (first) map.flyTo({ center: [state.me.lon, state.me.lat], zoom: Math.max(map.getZoom(), 14.5) });
+  if (first) {
+    const to = { center: [state.me.lon, state.me.lat], zoom: Math.max(map.getZoom(), 14.5) };
+    // Aus der Deutschland-Übersicht direkt springen (ein langer Flug wird sonst leicht unterbrochen)
+    const go = () => (map.getZoom() < MIN_LOAD_ZOOM ? map.jumpTo(to) : map.flyTo(to));
+    if (map.loaded()) go(); else map.once('load', go); // vor dem Laden der Karte würde der Flug verpuffen
+  }
   loadVisible();
   updateHeader();
   if (!state.selected) renderList();
@@ -738,19 +744,35 @@ function openDetail(it, fly = false) {
     <div class="actions">
       <a class="btn primary" data-route="${it._i}" href="${routeUrl(it)}" target="_blank" rel="noopener">${ICON_ROUTE}Route</a>
       ${R.enabled() ? (it.src === 'user' && !isConfirmed(it)
-        ? `<button class="btn" id="confirm">Gibt es (${confirmCount(it)}/${R.CONFIRM_NEEDED})</button>`
+        ? `<button class="btn" id="confirm">Gibt es (${confirmCount(it)}/${R.CONFIRM_NEEDED})</button><button class="btn" id="deny">Gibt es nicht</button>`
         : `<button class="btn" id="report-btn">${ICON_FLAG}Melden</button>`)
         : (!it.src ? `<a class="btn" href="${noteUrl(it)}" target="_blank" rel="noopener">${ICON_FLAG}Korrigieren</a>` : '')}
     </div>
     ${state.nav ? `<div class="navpref">Navigation mit ${esc(NAV[state.nav].name)} · <button id="navchange">ändern</button></div>` : ''}
     <div class="src">${sourceLine(it, checked)}</div>
+    ${it.src === 'user' || repOf(it) ? `<div class="src"><a href="${esc(dsaMailUrl(it))}">Rechtswidrigen Inhalt melden</a></div>` : ''}
   </div>`;
   $('#close').addEventListener('click', closeDetail);
   $('#navchange')?.addEventListener('click', () => openChooser(null));
   $('#report-btn')?.addEventListener('click', () => openReport(it));
   $('#confirm')?.addEventListener('click', () => submit({ place_id: it.id, category: it.c, kind: 'confirm', lat: it.lat, lon: it.lon }, 'Danke für die Bestätigung!'));
+  $('#deny')?.addEventListener('click', () => submit({ place_id: it.id, category: it.c, kind: 'gone', lat: it.lat, lon: it.lon }, 'Danke! Nach zwei solchen Meldungen wird der Ort ausgeblendet.'));
   layoutSheet();
   if (fly) map.easeTo({ center: [it.lon, it.lat], zoom: Math.max(map.getZoom(), 16) });
+}
+/** Meldeweg nach Art. 16 DSA: vorbefüllte E-Mail mit allen Pflichtangaben (kein Formular, keine Speicherung in der App). */
+function dsaMailUrl(it) {
+  const lat = it.lat.toFixed(5), lon = it.lon.toFixed(5);
+  const body = [
+    'Meldung eines rechtswidrigen Inhalts (Art. 16 DSA)', '',
+    `Betroffener Ort: ${titleOf(it)} (ID ${it.id})`,
+    `Position: ${lat}, ${lon} – https://www.openstreetmap.org/?mlat=${lat}&mlon=${lon}#map=19/${lat}/${lon}`, '',
+    'Welcher Inhalt ist betroffen (z. B. eingetragener Ort, Zustandsmeldung)?', '', '',
+    'Warum ist der Inhalt rechtswidrig? Bitte begründen:', '', '',
+    'Dein Name:', 'Deine E-Mail-Adresse:', '',
+    'Ich erkläre, dass ich in gutem Glauben davon überzeugt bin, dass die Angaben und Behauptungen in dieser Meldung richtig und vollständig sind.',
+  ].join('\n');
+  return `mailto:${CONTACT_MAIL}?subject=${encodeURIComponent('Nahfuchs – rechtswidriger Inhalt (Art. 16 DSA)')}&body=${encodeURIComponent(body)}`;
 }
 function sourceLine(it, checked) {
   const S = state.index?.sources || {};
@@ -824,8 +846,13 @@ function applyReports() {
   all.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
   state.rep = R.summarize(all);
   let added = false;
+  // Missbrauchsschutz: unbestätigte, von Nutzern eingetragene Orte verschwinden, sobald 2 Geräte „gibt es nicht“ melden
+  const userHidden = (r) => r && r.newPlace && r.confirm.size < R.CONFIRM_NEEDED && r.gone.size >= 2;
+  const before = state.items.length;
+  state.items = state.items.filter((it) => !(it.src === 'user' && userHidden(state.rep.get(it.id))));
+  if (state.items.length !== before) { added = true; if (state.selected && !state.items.includes(state.selected)) state.selected = null; }
   for (const [id, r] of state.rep) {
-    if (!r.newPlace || state.items.some((it) => it.id === id)) continue;
+    if (!r.newPlace || userHidden(r) || state.items.some((it) => it.id === id)) continue;
     const n = r.newPlace;
     state.items.push({ id, c: n.category, lat: n.lat, lon: n.lon, t: {}, src: 'user' });
     added = true;
