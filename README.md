@@ -1,8 +1,8 @@
-# Around the Corner
+# Nahfuchs
 
-Karten-App für die „analoge Welt“: Briefkästen (mit Leerungszeiten), Glas-, Papier- und Altkleidercontainer, öffentliche Toiletten, Autobahn-Rastplätze, Tankstellen (mit Tankkarten-Filter), Packstationen, Geldautomaten und Ladesäulen – mit Route in Google Maps.
+Karten-App für die „analoge Welt“: Briefkästen (mit Leerungszeiten), Glas-, Papier- und Altkleidercontainer, öffentliche Toiletten, Autobahn-Rastplätze, Tankstellen (mit Tankkarten-Filter), Packstationen und Paketshops, Wertstoffhöfe, Apotheken, Geldautomaten und Ladesäulen – mit Route in Google Maps, Apple Karten oder Waze. Kostenlos, ohne Konto, ohne Werbung und ohne Tracking.
 
-- App: https://andreasdauns.github.io/kartenapp-analoge-orte/
+- App: https://nahfuchs.de
 - Daten: OpenStreetMap (ODbL), täglich automatisch aktualisiert (`scripts/build-data.mjs`, Region in `config.json`)
 - Karte: MapLibre GL + OpenFreeMap
 

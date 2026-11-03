@@ -38,13 +38,8 @@ export async function fetchBox(s, w, n, e) {
   // Bevorzugt: geschützte Abfrage (begrenzter Ausschnitt, Geräte-IDs nur je Ort pseudonymisiert)
   const rpc = await fetch(`${SUPABASE.url}/rest/v1/rpc/reports_in_box`, { method: 'POST', headers: H(), body: JSON.stringify({ s, w, n, e }) }).catch(() => null);
   if (rpc && rpc.ok) return rpc.json();
-  if (rpc && rpc.status !== 404) throw new Error(`Meldungen: HTTP ${rpc.status}`);
-  // Übergang, solange die Funktion in der Datenbank noch fehlt
-  const since = new Date(Date.now() - 365 * 24 * HOURS).toISOString();
-  const q = `select=place_id,category,kind,status,message,lat,lon,device,created_at,expires_at&lat=gte.${s.toFixed(4)}&lat=lte.${n.toFixed(4)}&lon=gte.${w.toFixed(4)}&lon=lte.${e.toFixed(4)}&created_at=gte.${since}&order=created_at.desc&limit=5000`;
-  const res = await fetch(`${SUPABASE.url}/rest/v1/reports?${q}`, { headers: H() });
-  if (!res.ok) throw new Error(`Meldungen: HTTP ${res.status}`);
-  return res.json();
+  // Kein Direktzugriff auf die Tabelle: Lesen ausschließlich über die geschützte Funktion
+  throw new Error(`Meldungen: HTTP ${rpc ? rpc.status : 'offline'}`);
 }
 
 /** Eine Meldung abschicken. */

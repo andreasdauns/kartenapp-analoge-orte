@@ -176,8 +176,20 @@
   fetch('data/index.json').then((r) => r.json()).then((d) => {
     const rows = Object.values(d.sources || {}).sort((a, b) => (b.count || 0) - (a.count || 0));
     const t = document.getElementById('sources');
-    t.innerHTML = '<tr><th>Quelle</th><th>Lizenz</th><th>Orte</th></tr>' + rows.map((s) =>
-      `<tr><td><a href="${s.url}">${s.name}</a></td><td>${s.license}</td><td>${(s.count || 0).toLocaleString('de-DE')}${s.enriched ? ` (+${s.enriched} ergänzt)` : ''}</td></tr>`).join('');
+    // Sicher aufbauen: Texte nur über textContent, Links nur mit https
+    const cell = (tr, text, href) => {
+      const td = tr.insertCell();
+      let ok = false; try { ok = new URL(href).protocol === 'https:'; } catch { /* kein Link */ }
+      if (href && ok) { const a = document.createElement('a'); a.href = href; a.rel = 'noopener'; a.textContent = text; td.append(a); } else td.textContent = text;
+    };
+    t.textContent = '';
+    const head = t.insertRow(); for (const h of ['Quelle', 'Lizenz', 'Orte']) { const th = document.createElement('th'); th.textContent = h; head.append(th); }
+    for (const s of rows) {
+      const tr = t.insertRow();
+      cell(tr, String(s.name || ''), s.url);
+      cell(tr, String(s.license || ''));
+      cell(tr, (Number(s.count) || 0).toLocaleString('de-DE') + (s.enriched ? ` (+${Number(s.enriched) || 0} ergänzt)` : ''));
+    }
   }).catch(() => {});
 </script>
 </body>

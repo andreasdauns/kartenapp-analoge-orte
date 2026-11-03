@@ -10,6 +10,8 @@ const POST_CHANGE = '2025-07-01'; // Deutsche Post hat 2025 die Leerungszeiten u
 const START = { lat: 50.5446, lon: 7.1136, zoom: 13 };
 
 const $ = (s) => document.querySelector(s);
+/** Nur https-Links aus Datenquellen zulassen (Schutz vor manipulierten Links). */
+const safeUrl = (u) => { try { const x = new URL(u); return x.protocol === 'https:' ? esc(x.href) : '#'; } catch { return '#'; } };
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
@@ -204,14 +206,14 @@ function factsOf(it) {
     add('Öffnungszeiten', weekSummary(parseHours(t.opening_hours)) || t.opening_hours);
     add('Gebühr', t.fee === 'no' ? 'kostenlos' : t.fee === 'yes' ? (t.charge || 'ja') : null);
     add('Euroschlüssel', t.centralkey === 'eurokey' ? 'ja' : null);
-    add('Barrierefrei', jaNein(t.wheelchair));
+    add('Rollstuhlgerecht', t.wheelchair ? `${jaNein(t.wheelchair)} (laut Kartendaten, bitte vorab prüfen)` : null);
     add('Wickeltisch', jaNein(t.changing_table));
     add('Zugang', t.access === 'customers' ? 'nur für Kunden' : null);
   }
   if (it.c === 'rastplatz') {
     add('Art', t.highway === 'services' ? 'Raststätte' : 'Rastplatz / Parkplatz');
     add('Toiletten', t.toilets ? jaNein(t.toilets) : 'unbekannt');
-    add('Barrierefreies WC', jaNein(t['toilets:wheelchair']));
+    add('Rollstuhlgerechtes WC', t['toilets:wheelchair'] ? `${jaNein(t['toilets:wheelchair'])} (laut Kartendaten, bitte vorab prüfen)` : null);
     add('Ausstattung', t['autobahn:features']);
     add('Stellplätze', t['autobahn:info']);
     add('Fahrtrichtung', t.ref);
@@ -310,7 +312,7 @@ function extraChips(it) {
   }
   if (it.c === 'toilette') {
     if (t.centralkey === 'eurokey') out.push({ cls: '', text: 'Euroschlüssel' });
-    if (t.wheelchair === 'yes') out.push({ cls: '', text: 'barrierefrei' });
+    if (t.wheelchair === 'yes') out.push({ cls: '', text: 'rollstuhlgerecht (laut Karte)' });
   }
   return out;
 }
@@ -742,7 +744,7 @@ function sourceLine(it, checked) {
   const parts = [];
   if (!it.src) parts.push(`<a href="https://www.openstreetmap.org/${{ n: 'node', w: 'way', r: 'relation' }[it.id[0]]}/${it.id.slice(1)}" target="_blank" rel="noopener">OpenStreetMap</a>`);
   if (it.src === 'user') parts.push(`von Nutzern gemeldet · ${isConfirmed(it) ? 'bestätigt' : `noch nicht bestätigt (${confirmCount(it)}/${R.CONFIRM_NEEDED})`}`);
-  for (const k of [it.src, it.src2].filter(Boolean)) if (S[k]) parts.push(`<a href="${S[k].url}" target="_blank" rel="noopener">${esc(S[k].name)}</a> (${esc(S[k].license)})`);
+  for (const k of [it.src, it.src2].filter(Boolean)) if (S[k]) parts.push(`<a href="${safeUrl(S[k].url)}" target="_blank" rel="noopener">${esc(S[k].name)}</a> (${esc(S[k].license)})`);
   return `Quelle: ${parts.join(' · ')}${checked ? ` · vor Ort geprüft ${esc(fmtDate(checked))}` : ''}`;
 }
 function closeDetail() {
@@ -1035,7 +1037,7 @@ async function init() {
     if (!res.ok) throw new Error(res.status);
     state.index = await res.json();
     const extra = Object.entries(state.index.sources || {}).filter(([k]) => k !== 'osm')
-      .map(([, v]) => `<a href="${v.url}" target="_blank" rel="noopener">${esc(v.name)}</a> (${esc(v.license)})`);
+      .map(([, v]) => `<a href="${safeUrl(v.url)}" target="_blank" rel="noopener">${esc(v.name)}</a> (${esc(v.license)})`);
     map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '<a href="info.html">Impressum · Datenschutz · Nutzung</a>' + (extra.length ? ' · Weitere Daten: ' + extra.join(', ') : '') }), 'bottom-left');
     setTimeout(() => document.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show'), 1500);
     const g = new Date(state.index.generated);
