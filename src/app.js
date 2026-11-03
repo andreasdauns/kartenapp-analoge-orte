@@ -384,6 +384,8 @@ const map = new maplibregl.Map({
   pitchWithRotate: false,
 });
 map.touchZoomRotate.disableRotation();
+// map.loaded() ist false, solange Kacheln nachladen – daher eigenes Flag für „Karte einmal fertig geladen“
+map.once('load', () => { state.mapReady = true; });
 if (!view) map.fitBounds(DE_BOUNDS, { padding: 24, animate: false });
 
 
@@ -529,15 +531,17 @@ function setMe(pos) {
   state.me = { lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy };
   map.getSource('me')?.setData(fc([pointF(state.me.lon, state.me.lat)]));
   $('#btn-locate').classList.add('active');
-  if (first) {
-    const to = { center: [state.me.lon, state.me.lat], zoom: Math.max(map.getZoom(), 14.5) };
-    // Aus der Deutschland-Übersicht direkt springen (ein langer Flug wird sonst leicht unterbrochen)
-    const go = () => (map.getZoom() < MIN_LOAD_ZOOM ? map.jumpTo(to) : map.flyTo(to));
-    if (map.loaded()) go(); else map.once('load', go); // vor dem Laden der Karte würde der Flug verpuffen
-  }
   loadVisible();
   updateHeader();
-  if (!state.selected) renderList();
+  if (!state.selected) renderList(); // erst Layout/Padding festlegen, dann die Karte bewegen
+  if (first) { if (state.mapReady) centerOnMe(); else map.once('load', centerOnMe); }
+}
+/** Karte auf den eigenen Standort (Stadt-Zoom); holt den Zoom nach, falls eine Fahrt abgebrochen wurde. */
+function centerOnMe() {
+  if (!state.me) return;
+  const to = { center: [state.me.lon, state.me.lat], zoom: Math.max(map.getZoom(), 14.5) };
+  map.once('moveend', () => { if (map.getZoom() < 13) map.easeTo({ center: [state.me.lon, state.me.lat], zoom: 14.5 }); });
+  if (map.getZoom() < MIN_LOAD_ZOOM) map.jumpTo(to); else map.flyTo(to);
 }
 const LOC_ERR = {
   1: 'Dein Gerät hat den Standort für diesen Browser gesperrt. iPhone: Einstellungen → Apps → Chrome (bzw. Safari) → Standort → „Beim Verwenden der App“; danach hier erneut tippen. Android/PC: Standort für nahfuchs.de in den Website-Einstellungen erlauben.',
@@ -556,7 +560,7 @@ function locFailed(code) {
 function startLocate() {
   if (!('geolocation' in navigator)) { locFailed('na'); return; }
   if (state.watchId != null) {
-    if (state.me) map.flyTo({ center: [state.me.lon, state.me.lat], zoom: Math.max(map.getZoom(), 14.5) });
+    centerOnMe();
     return;
   }
   if (state.locating) return;
@@ -607,7 +611,11 @@ function layoutSheet() {
   setVisible(h);
   const pad = { top: Math.round($('.top').offsetHeight + 8), bottom: Math.round(wide() ? 0 : Math.min(h, innerHeight * 0.5)), left: wide() ? 420 : 0, right: 0 };
   const cur = map.getPadding();
-  if (cur.top !== pad.top || cur.bottom !== pad.bottom || cur.left !== pad.left) map.setPadding(pad);
+  if (cur.top !== pad.top || cur.bottom !== pad.bottom || cur.left !== pad.left) {
+    // setPadding würde eine laufende Kamerafahrt abbrechen → erst danach nachziehen
+    if (map.isMoving()) { if (!state.padPending) { state.padPending = true; map.once('moveend', () => { state.padPending = false; layoutSheet(); }); } }
+    else map.setPadding(pad);
+  }
   document.documentElement.style.setProperty('--cross-y', `${Math.round(pad.top + (innerHeight - pad.top - pad.bottom) / 2)}px`);
 }
 addEventListener('resize', layoutSheet);
@@ -1107,7 +1115,7 @@ async function init() {
     body.innerHTML = '<div class="empty">Orte werden geladen …</div>';
     layoutSheet();
     const go = () => { loadVisible(); if (!state.me && !state.selected) renderList(); };
-    if (map.loaded()) go(); else map.once('load', go);
+    if (state.mapReady) go(); else map.once('load', go);
   } catch {
     message('Die Ortsdaten werden gerade erstellt. Schau in ein paar Minuten nochmal rein.');
   }
