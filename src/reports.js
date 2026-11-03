@@ -91,3 +91,10 @@ export function ago(ts) {
   const d = Math.round(h / 24);
   return d === 1 ? 'gestern' : `vor ${d} Tagen`;
 }
+
+/** Wünsche und Rückmeldungen: nur die angetippten Auswahlpunkte, ohne Geräte-ID, ohne Text. */
+export async function sendWishes(items) {
+  if (!enabled()) throw new Error('Senden ist gerade nicht möglich.');
+  const res = await fetch(`${SUPABASE.url}/rest/v1/wishes`, { method: 'POST', headers: { ...H(), Prefer: 'return=minimal' }, body: JSON.stringify(items.map((item) => ({ item }))) });
+  if (!res.ok) throw new Error('Konnte nicht gesendet werden. Bitte später erneut versuchen.');
+}

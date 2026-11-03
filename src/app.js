@@ -352,7 +352,7 @@ $('#providers').addEventListener('click', (e) => {
   if (!state.selected) renderList();
 });
 $('#chips').addEventListener('click', (e) => {
-  const b = e.target.closest('.chip');
+  const b = e.target.closest('.chip[data-id]');
   if (!b) return;
   const id = b.dataset.id;
   if (state.active.has(id)) state.active.delete(id); else state.active.add(id); // jede Kategorie einzeln an/aus
@@ -976,6 +976,53 @@ $('#support-never').addEventListener('click', () => { store.set('supportHidden',
 if (new URLSearchParams(location.search).has('unterstuetzen')) maybeShowSupport(true);
 // Alte, nicht mehr verwendete Einträge früherer Versionen entfernen
 try { ['firstSeen', 'useDays', 'support'].forEach((k) => localStorage.removeItem(k)); } catch { /* egal */ }
+
+// ---------- Wünsche & Rückmeldungen ----------
+// Kein Pop-up: Das Fenster öffnet sich nur, wenn jemand selbst auf den Sprechblasen-Knopf tippt.
+// Gesendet werden nur die angetippten Punkte (feste Liste) – ohne Geräte-ID, ohne Freitext.
+const WISH_CATS = [
+  ['aed', 'Defibrillatoren (AED)'], ['trinkwasser', 'Trinkbrunnen'], ['buecher', 'Bücherschränke'],
+  ['fahrrad', 'Fahrrad-Reparatur'], ['wickeln', 'Wickeltische'], ['spielplatz', 'Spielplätze'],
+  ['hundekot', 'Hundekotbeutel'], ['wohnmobil', 'Wohnmobil-Stellplätze'],
+];
+const WISH_FB = [
+  ['ort_fehlt', 'Ein Ort fehlt'], ['daten_falsch', 'Angaben stimmen oft nicht'], ['langsam', 'Karte lädt langsam'],
+  ['standort', 'Standort klappt nicht'], ['bedienung', 'Bedienung umständlich'], ['gefaellt', 'Gefällt mir 👍'],
+];
+const wishBtns = (list) => list.map(([id, label]) => `<button class="wchip" data-w="${id}" aria-pressed="false">${esc(label)}</button>`).join('');
+$('#wish-cats').innerHTML = wishBtns(WISH_CATS);
+$('#wish-fb').innerHTML = wishBtns(WISH_FB);
+$('#wish-mail').href = 'mailto:' + ['andreas.dauns.apps', 'gmail.com'].join('@') + '?subject=' + encodeURIComponent('Nahfuchs-Idee');
+let wishSent = false;
+function openWish() {
+  $('#wish').querySelectorAll('.wchip').forEach((b) => b.setAttribute('aria-pressed', 'false'));
+  $('#wish-send').disabled = true;
+  $('#wish-send').textContent = wishSent ? 'Danke, schon gesendet!' : 'Abschicken';
+  $('#wish').hidden = false;
+}
+document.addEventListener('click', (e) => { if (e.target.closest('[data-wish]')) openWish(); });
+$('#wish').addEventListener('click', (e) => {
+  const b = e.target.closest('.wchip');
+  if (b) {
+    b.setAttribute('aria-pressed', b.getAttribute('aria-pressed') === 'true' ? 'false' : 'true');
+    $('#wish-send').disabled = wishSent || !$('#wish').querySelector('.wchip[aria-pressed="true"]');
+  } else if (e.target === $('#wish')) $('#wish').hidden = true;
+});
+$('#wish-close').addEventListener('click', () => { $('#wish').hidden = true; });
+$('#wish-send').addEventListener('click', async () => {
+  const picked = [...$('#wish').querySelectorAll('.wchip[aria-pressed="true"]')].map((b) => b.dataset.w);
+  if (!picked.length || wishSent) return;
+  $('#wish-send').disabled = true;
+  try {
+    await R.sendWishes(picked);
+    wishSent = true;
+    $('#wish').hidden = true;
+    toast(picked.includes('ort_fehlt') ? 'Danke! Tipp: Fehlende Orte kannst du selbst mit dem + Knopf eintragen.' : 'Danke für deine Rückmeldung!');
+  } catch (err) {
+    $('#wish-send').disabled = false;
+    toast(err.message);
+  }
+});
 
 // ---------- Start ----------
 async function init() {
