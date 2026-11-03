@@ -539,17 +539,39 @@ function setMe(pos) {
   updateHeader();
   if (!state.selected) renderList();
 }
+const LOC_ERR = {
+  1: 'Dein Gerät hat den Standort für diesen Browser gesperrt. iPhone: Einstellungen → Apps → Chrome (bzw. Safari) → Standort → „Beim Verwenden der App“; danach hier erneut tippen. Android/PC: Standort für nahfuchs.de in den Website-Einstellungen erlauben.',
+  2: 'Standort konnte gerade nicht ermittelt werden. Bitte nochmal versuchen oder die Karte selbst verschieben.',
+  3: 'Standort konnte gerade nicht ermittelt werden. Bitte nochmal versuchen oder die Karte selbst verschieben.',
+  na: 'Dein Browser kann keinen Standort ermitteln. Bitte schieb die Karte selbst zu deinem Ort.',
+};
+const overviewCard = () => !state.me && !state.selected && map.getZoom() < MIN_LOAD_ZOOM;
+function locFailed(code) {
+  state.locating = false;
+  state.locError = code;
+  if (state.watchId != null) { navigator.geolocation.clearWatch(state.watchId); state.watchId = null; }
+  $('#btn-locate').classList.remove('active');
+  if (overviewCard()) renderList(); else toast(LOC_ERR[code] || LOC_ERR[2]);
+}
 function startLocate() {
-  if (!('geolocation' in navigator)) return;
+  if (!('geolocation' in navigator)) { locFailed('na'); return; }
   if (state.watchId != null) {
     if (state.me) map.flyTo({ center: [state.me.lon, state.me.lat], zoom: Math.max(map.getZoom(), 14.5) });
     return;
   }
-  state.watchId = navigator.geolocation.watchPosition(setMe, (err) => {
-    state.watchId = null;
-    $('#btn-locate').classList.remove('active');
-    if (err.code === 1) message('Standort ist nicht freigegeben. Du kannst ihn in den Einstellungen erlauben – die Liste zeigt sonst die Entfernung zur Kartenmitte.');
-  }, { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 });
+  if (state.locating) return;
+  state.locating = true;
+  state.locError = null;
+  if (overviewCard()) renderList();
+  // Erst einmalig abfragen (zuverlässiger auf iOS), danach laufend aktualisieren
+  navigator.geolocation.getCurrentPosition((pos) => {
+    state.locating = false;
+    state.locError = null;
+    setMe(pos);
+    if (state.watchId == null) {
+      state.watchId = navigator.geolocation.watchPosition(setMe, (err) => { if (err.code === 1) locFailed(1); }, { enableHighAccuracy: true, maximumAge: 15000, timeout: 20000 });
+    }
+  }, (err) => locFailed(err.code), { enableHighAccuracy: true, maximumAge: 60000, timeout: 15000 });
 }
 $('#btn-locate').addEventListener('click', startLocate);
 try {
@@ -691,7 +713,8 @@ function renderList() {
   const list = near.slice(0, LIST_LIMIT);
   if (!state.me && map.getZoom() < MIN_LOAD_ZOOM) {
     body.innerHTML = `<div class="sheet-h"><h2>Wo suchst du? 🦊</h2></div>
-      <button class="btn primary locate-cta" id="use-loc">📍 Meinen Standort verwenden</button>
+      <button class="btn primary locate-cta" id="use-loc"${state.locating ? ' disabled' : ''}>${state.locating ? 'Standort wird gesucht …' : '📍 Meinen Standort verwenden'}</button>
+      ${state.locError ? `<div class="hint loc-err">${esc(LOC_ERR[state.locError] || LOC_ERR[2])}</div>` : ''}
       <div class="empty">Oder schieb die Karte zu deinem Ort und zoom hinein. Dein Standort bleibt auf deinem Gerät und wird nicht gespeichert.</div>`;
     $('#use-loc').addEventListener('click', startLocate);
     layoutSheet();

@@ -242,3 +242,5 @@ body.dragging .fabs, body.dragging .maplibregl-ctrl-bottom-left { transition: no
 .wish-card .btn.primary:disabled { opacity: .45; }
 .chooser-card a.link.wish-mail { text-align: center; text-decoration: none; color: var(--accent-2); padding: 8px 10px 0; font-size: 14px; }
 .locate-cta { width: 100%; margin: 4px 0 8px; flex: none; }
+.hint.loc-err { text-align: left; font-size: 13px; color: var(--warn); background: var(--warn-bg); border-radius: 12px; padding: 10px 12px; margin: 0 0 8px; }
+.locate-cta:disabled { opacity: .6; }
