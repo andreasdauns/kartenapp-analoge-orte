@@ -208,14 +208,14 @@ function factsOf(it) {
     add('Öffnungszeiten', weekSummary(parseHours(t.opening_hours)) || t.opening_hours);
     add('Gebühr', t.fee === 'no' ? 'kostenlos' : t.fee === 'yes' ? (t.charge || 'ja') : null);
     add('Euroschlüssel', t.centralkey === 'eurokey' ? 'ja' : null);
-    add('Rollstuhlgerecht', t.wheelchair ? `${jaNein(t.wheelchair)} (laut Kartendaten, bitte vorab prüfen)` : null);
+    add('Barrierefrei', t.wheelchair ? `${jaNein(t.wheelchair)} (laut Kartendaten, bitte vorab prüfen)` : null);
     add('Wickeltisch', jaNein(t.changing_table));
     add('Zugang', t.access === 'customers' ? 'nur für Kunden' : null);
   }
   if (it.c === 'rastplatz') {
     add('Art', t.highway === 'services' ? 'Raststätte' : 'Rastplatz / Parkplatz');
     add('Toiletten', t.toilets ? jaNein(t.toilets) : 'unbekannt');
-    add('Rollstuhlgerechtes WC', t['toilets:wheelchair'] ? `${jaNein(t['toilets:wheelchair'])} (laut Kartendaten, bitte vorab prüfen)` : null);
+    add('Barrierefreies WC', t['toilets:wheelchair'] ? `${jaNein(t['toilets:wheelchair'])} (laut Kartendaten, bitte vorab prüfen)` : null);
     add('Ausstattung', t['autobahn:features']);
     add('Stellplätze', t['autobahn:info']);
     add('Fahrtrichtung', t.ref);
@@ -314,7 +314,7 @@ function extraChips(it) {
   }
   if (it.c === 'toilette') {
     if (t.centralkey === 'eurokey') out.push({ cls: '', text: 'Euroschlüssel' });
-    if (t.wheelchair === 'yes') out.push({ cls: '', text: 'rollstuhlgerecht (laut Karte)' });
+    if (t.wheelchair === 'yes') out.push({ cls: '', text: 'barrierefrei (laut Karte)' });
   }
   return out;
 }
@@ -370,7 +370,9 @@ $('#chips').addEventListener('click', (e) => {
 });
 
 // ---------- Karte ----------
-const view = store.get('view', null);
+// Kartenausschnitt wird bewusst NICHT gespeichert (Datensparsamkeit, § 25 TDDDG); alten Eintrag entfernen
+try { localStorage.removeItem('view'); } catch { /* egal */ }
+const view = null;
 const map = new maplibregl.Map({
   container: 'map',
   style: STYLE_URL,
@@ -462,7 +464,6 @@ map.on('moveend', () => {
   clearTimeout(moveTimer);
   moveTimer = setTimeout(() => {
     const c = map.getCenter();
-    store.set('view', { lat: c.lat, lon: c.lng, zoom: map.getZoom() });
     loadVisible();
     loadReports();
     updateHeader();
