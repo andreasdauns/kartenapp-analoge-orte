@@ -7,7 +7,9 @@ const LIST_LIMIT = 25;
 const PEEK_ROWS = 2;
 const MIN_LOAD_ZOOM = 9;
 const POST_CHANGE = '2025-07-01'; // Deutsche Post hat 2025 die Leerungszeiten umgestellt
-const START = { lat: 50.5446, lon: 7.1136, zoom: 13 };
+// Start ohne gespeicherten Ausschnitt: ganz Deutschland (kein fester Ort, der Rückschlüsse zulässt)
+const START = { lat: 51.16, lon: 10.45, zoom: 5 };
+const DE_BOUNDS = [[5.87, 47.27], [15.04, 55.06]];
 
 const $ = (s) => document.querySelector(s);
 /** Nur https-Links aus Datenquellen zulassen (Schutz vor manipulierten Links). */
@@ -379,6 +381,7 @@ const map = new maplibregl.Map({
   pitchWithRotate: false,
 });
 map.touchZoomRotate.disableRotation();
+if (!view) map.fitBounds(DE_BOUNDS, { padding: 24, animate: false });
 
 
 function markerImage(cat) {
@@ -505,6 +508,7 @@ async function loadTiles(keys) {
 }
 function loadVisible() {
   if (!state.index) return;
+  if (!state.me && map.getZoom() < MIN_LOAD_ZOOM) return; // Übersicht: erst laden, wenn ein Ort gewählt ist
   const r = refPoint();
   const keys = keysAround(r.lat, r.lon, 1);
   if (map.getZoom() >= MIN_LOAD_ZOOM) keys.push(...keysInView());
@@ -678,6 +682,14 @@ function renderList() {
   });
   near.sort((a, b) => a.d - b.d);
   const list = near.slice(0, LIST_LIMIT);
+  if (!state.me && map.getZoom() < MIN_LOAD_ZOOM) {
+    body.innerHTML = `<div class="sheet-h"><h2>Wo suchst du? 🦊</h2></div>
+      <button class="btn primary locate-cta" id="use-loc">📍 Meinen Standort verwenden</button>
+      <div class="empty">Oder schieb die Karte zu deinem Ort und zoom hinein. Dein Standort bleibt auf deinem Gerät und wird nicht gespeichert.</div>`;
+    $('#use-loc').addEventListener('click', startLocate);
+    layoutSheet();
+    return;
+  }
   if (!state.active.size) {
     body.innerHTML = '<div class="sheet-h"><h2>Was suchst du?</h2></div><div class="empty">Tippe oben auf eine oder mehrere Kategorien, z. B. Briefkästen oder Glascontainer.</div>';
     layoutSheet();
@@ -1043,7 +1055,8 @@ async function init() {
     const g = new Date(state.index.generated);
     body.innerHTML = '<div class="empty">Orte werden geladen …</div>';
     layoutSheet();
-    if (map.loaded()) loadVisible(); else map.once('load', loadVisible);
+    const go = () => { loadVisible(); if (!state.me && !state.selected) renderList(); };
+    if (map.loaded()) go(); else map.once('load', go);
   } catch {
     message('Die Ortsdaten werden gerade erstellt. Schau in ein paar Minuten nochmal rein.');
   }

@@ -241,3 +241,4 @@ body.dragging .fabs, body.dragging .maplibregl-ctrl-bottom-left { transition: no
 .wish-card .btn.primary { margin-top: 8px; }
 .wish-card .btn.primary:disabled { opacity: .45; }
 .chooser-card a.link.wish-mail { text-align: center; text-decoration: none; color: var(--accent-2); padding: 8px 10px 0; font-size: 14px; }
+.locate-cta { width: 100%; margin: 4px 0 8px; flex: none; }
