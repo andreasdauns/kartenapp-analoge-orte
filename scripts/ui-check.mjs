@@ -371,6 +371,41 @@ async function roundCheck() {
 }
 await roundCheck();
 
+// App-Kurzbefehle (Manifest + Startlinks): jeder Link öffnet das Richtige
+async function shortcutCheck() {
+  const man = JSON.parse(await readFile(new URL('../manifest.webmanifest', import.meta.url), 'utf8'));
+  const sc = man.shortcuts || [];
+  if (sc.length !== 4) bad('Kurzbefehle', `${sc.length} statt 4 Kurzbefehle im Manifest`);
+  for (const s of sc) for (const ic of s.icons || []) { try { await readFile(new URL('../' + ic.src, import.meta.url)); } catch { bad('Kurzbefehle', `Symbol fehlt: ${ic.src}`); } }
+  const browser = await chromium.launch();
+  for (const [k, expect] of [['toilette', 'detail'], ['briefkasten', 'detail'], ['runde', 'round'], ['zuletzt', 'none']]) {
+    const ctx = `Kurzbefehl ${k}`;
+    const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, geolocation: { latitude: PLACES[0].lat, longitude: PLACES[0].lon }, permissions: ['geolocation'], locale: 'de-DE' });
+    await context.route(/openfreemap\.org/, (r) => (r.request().url().includes('/styles/') ? r.fulfill({ contentType: 'application/json', body: BLANK_STYLE }) : r.abort()));
+    await context.route(/supabase\.co/, (r) => r.fulfill({ contentType: 'application/json', body: '[]' }));
+    await context.addInitScript(() => { try { if (!sessionStorage.getItem('x')) { localStorage.clear(); localStorage.setItem('welcomed', '1'); localStorage.setItem('supportHidden', '1'); localStorage.setItem('cats', JSON.stringify(['geldautomat'])); sessionStorage.setItem('x', '1'); } } catch { /* */ } });
+    const page = await context.newPage();
+    page.on('pageerror', (e) => { if (!/WebGL/.test(e.message)) bad(ctx, `JavaScript-Fehler: ${e.message}`); });
+    await page.goto(BASE + '?k=' + k);
+    await page.waitForTimeout(4500);
+    const cats = await activeCats(page);
+    if (/[?&]k=/.test(page.url())) bad(ctx, 'Startlink bleibt in der Adresse stehen');
+    if (expect === 'detail') {
+      if (cats.join(',') !== k) bad(ctx, `aktiv: ${cats.join(', ')} statt nur ${k}`);
+      if (!(await page.locator('.detail').count())) bad(ctx, 'nächster Ort wird nicht geöffnet');
+      else {
+        const rows = await page.evaluate(() => document.querySelector('.detail h2')?.textContent || '');
+        if (!rows) bad(ctx, 'Detail ohne Titel');
+      }
+    }
+    if (expect === 'round' && (await page.locator('#round').isHidden())) bad(ctx, 'Erledigungs-Runde öffnet nicht');
+    if (expect === 'none' && cats.join(',') !== 'geldautomat') bad(ctx, `„Wie zuletzt“ zeigt ${cats.join(', ') || 'nichts'} statt der letzten Auswahl`);
+    await context.close();
+  }
+  await browser.close();
+}
+await shortcutCheck();
+
 // Android-App (Start mit ?src=twa): keine Ko-fi-Links sichtbar (Google-Play-Zahlungsrichtlinie)
 async function twaCheck() {
   const browser = await chromium.launch();

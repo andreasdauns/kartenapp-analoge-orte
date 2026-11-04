@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- App-Kurzbefehle: lange auf das App-Symbol drücken -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="toilette" android:enabled="true" android:icon="@drawable/sc_toilette"
+        android:shortcutShortLabel="@string/sc_toilette_short" android:shortcutLongLabel="@string/sc_toilette_long">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="de.nahfuchs.app"
+            android:targetClass="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:data="https://nahfuchs.de/?src=twa&amp;k=toilette" />
+    </shortcut>
+    <shortcut android:shortcutId="briefkasten" android:enabled="true" android:icon="@drawable/sc_briefkasten"
+        android:shortcutShortLabel="@string/sc_brief_short" android:shortcutLongLabel="@string/sc_brief_long">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="de.nahfuchs.app"
+            android:targetClass="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:data="https://nahfuchs.de/?src=twa&amp;k=briefkasten" />
+    </shortcut>
+    <shortcut android:shortcutId="runde" android:enabled="true" android:icon="@drawable/sc_runde"
+        android:shortcutShortLabel="@string/sc_runde_short" android:shortcutLongLabel="@string/sc_runde_long">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="de.nahfuchs.app"
+            android:targetClass="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:data="https://nahfuchs.de/?src=twa&amp;k=runde" />
+    </shortcut>
+    <shortcut android:shortcutId="zuletzt" android:enabled="true" android:icon="@drawable/sc_zuletzt"
+        android:shortcutShortLabel="@string/sc_zuletzt_short" android:shortcutLongLabel="@string/sc_zuletzt_long">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="de.nahfuchs.app"
+            android:targetClass="com.google.androidbrowserhelper.trusted.LauncherActivity"
+            android:data="https://nahfuchs.de/?src=twa&amp;k=zuletzt" />
+    </shortcut>
+</shortcuts>

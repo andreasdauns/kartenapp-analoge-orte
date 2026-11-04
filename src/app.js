@@ -172,6 +172,19 @@ for (const g of GROUPS) {
   store.set(g.key, [...groupSel(g)]);
   store.set('cats', [...state.active]);
 }
+// App-Kurzbefehle (lange auf das App-Symbol drücken): ?k=toilette | briefkasten | runde | zuletzt
+// Die Auswahl bleibt nur auf dem Gerät; „wie zuletzt“ nutzt einfach die gespeicherte Auswahl.
+const SHORTCUT = (() => { try { return new URLSearchParams(location.search).get('k'); } catch { return null; } })();
+if (SHORTCUT) {
+  try { const u = new URL(location.href); u.searchParams.delete('k'); history.replaceState(null, '', u.pathname + u.search + u.hash); } catch { /* */ }
+  if (CATEGORY_BY_ID[SHORTCUT]) {
+    state.active = new Set([SHORTCUT]);
+    for (const g of GROUPS) { groupSel(g).clear(); if (g.members.includes(SHORTCUT)) groupSel(g).add(SHORTCUT); store.set(g.key, [...groupSel(g)]); }
+    store.set('cats', [...state.active]);
+    state.openNearest = SHORTCUT; // sobald Standort und Daten da sind: nächsten Ort öffnen
+  }
+}
+
 
 const NAV = {
   google: { name: 'Google Maps', url: (it) => `https://www.google.com/maps/dir/?api=1&destination=${it.lat},${it.lon}&travelmode=driving` },
@@ -725,8 +738,19 @@ async function loadTiles(keys) {
     map.getSource('pois')?.setData(geojson());
     updateHeader();
     if (!state.selected) renderList();
+    tryOpenNearest();
   }, 50);
   return true;
+}
+// Kurzbefehl „Nächste Toilette“ usw.: nächsten passenden Ort öffnen, sobald die Kacheln um den Standort geladen sind
+function tryOpenNearest() {
+  if (!state.openNearest || !state.me || !state.index || state.selected) return;
+  const around = keysAround(state.me.lat, state.me.lon, 1);
+  if (!around.every((k) => !(k in state.index.tiles) || state.loaded.has(k))) return;
+  state.openNearest = null;
+  let best = null, bestD = Infinity;
+  for (const it of state.items) { if (!passes(it)) continue; const d = distM(state.me, it); if (d < bestD) { bestD = d; best = it; } }
+  if (best && bestD < 30000) openDetail(best, true);
 }
 function loadVisible() {
   if (!state.index) return;
@@ -753,6 +777,7 @@ function setMe(pos) {
   updateHeader();
   if (!state.selected) renderList(); // erst Layout/Padding festlegen, dann die Karte bewegen
   if (first) { if (state.mapReady) centerOnMe(); else map.once('load', centerOnMe); }
+  tryOpenNearest();
 }
 /** Karte auf den eigenen Standort (Stadt-Zoom); holt den Zoom nach, falls eine Fahrt abgebrochen wurde. */
 function centerOnMe() {
@@ -1487,7 +1512,13 @@ async function init() {
     const g = new Date(state.index.generated);
     body.innerHTML = '<div class="empty">Orte werden geladen …</div>';
     layoutSheet();
-    const go = () => { loadVisible(); if (!state.me && !state.selected) renderList(); };
+    const go = () => {
+      loadVisible();
+      if (!state.me && !state.selected) renderList();
+      if (SHORTCUT) startLocate();
+      if (SHORTCUT === 'runde') openRound();
+      tryOpenNearest();
+    };
     if (state.mapReady) go(); else map.once('load', go);
   } catch {
     message('Die Ortsdaten werden gerade erstellt. Schau in ein paar Minuten nochmal rein.');

@@ -3,4 +3,12 @@
     <string name="app_name">Nahfuchs</string>
     <string name="launch_url">https://nahfuchs.de/?src=twa</string>
     <string name="asset_statements" translatable="false">[{\"relation\": [\"delegate_permission/common.handle_all_urls\"], \"target\": {\"namespace\": \"web\", \"site\": \"https://nahfuchs.de\"}}]</string>
+    <string name="sc_toilette_short">Toilette</string>
+    <string name="sc_toilette_long">Nächste Toilette</string>
+    <string name="sc_brief_short">Briefkasten</string>
+    <string name="sc_brief_long">Nächster Briefkasten</string>
+    <string name="sc_runde_short">Runde</string>
+    <string name="sc_runde_long">Erledigungs-Runde</string>
+    <string name="sc_zuletzt_short">Wie zuletzt</string>
+    <string name="sc_zuletzt_long">Wie zuletzt</string>
 </resources>
