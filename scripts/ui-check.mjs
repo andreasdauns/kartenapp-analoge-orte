@@ -126,6 +126,24 @@ async function run(kind, mobile) {
           await page.waitForTimeout(800);
         }
       }
+      if (chip.id === 'toilette') {
+        if (await page.locator('#wcrow').isHidden()) bad(ctx, 'Toiletten-Filterzeile erscheint nicht');
+        else {
+          const all = await page.locator('#sheet-body .row').count();
+          for (const f of ['free', 'wc', 'key', 'baby']) {
+            await page.locator(`#wcrow .chip[data-wc="${f}"]`).click();
+            await page.waitForTimeout(900);
+            if ((await page.locator(`#wcrow .chip[data-wc="${f}"]`).getAttribute('aria-pressed')) !== 'true') bad(ctx, `Toiletten-Filter „${f}“ wird nicht gedrückt`);
+            const wrong = await page.$$eval('#sheet-body .row', (a, x) => a.filter((r) => !(r.dataset.wf || '').split(' ').includes(x)).length, f);
+            if (wrong) bad(ctx, `Toiletten-Filter „${f}“ zeigt ${wrong} Toiletten ohne dieses Merkmal`);
+            await page.locator(`#wcrow .chip[data-wc="${f}"]`).click();
+            await page.waitForTimeout(900);
+            if ((await page.locator(`#wcrow .chip[data-wc="${f}"]`).getAttribute('aria-pressed')) !== 'false') bad(ctx, `Toiletten-Filter „${f}“ lässt sich nicht abwählen`);
+          }
+          const back = await page.locator('#sheet-body .row').count();
+          if (back !== all) bad(ctx, `Nach dem Abwählen der Toiletten-Filter ${back} statt ${all} Einträge`);
+        }
+      }
       if (chip.id === 'ladesaeule') {
         if (await page.locator('#evrow').isHidden()) bad(ctx, 'Ladesäulen-Filterzeile erscheint nicht');
         else {

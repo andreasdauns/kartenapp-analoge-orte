@@ -63,6 +63,16 @@ function evGroups() {
   if (g.kw?.includes('kw150')) g.kw = ['kw150'];
   return Object.values(g);
 }
+// ---------- Toiletten-Filter (laut Kartendaten; mehrere gewählt = alle müssen zutreffen) ----------
+const WC_FILTERS = [
+  { id: 'free', label: 'kostenlos', test: (t) => t.fee === 'no' },
+  { id: 'wc', label: 'barrierefrei', test: (t) => t.wheelchair === 'yes' || t['toilets:wheelchair'] === 'yes' },
+  { id: 'key', label: 'Euroschlüssel', test: (t) => t.centralkey === 'eurokey' },
+  { id: 'baby', label: 'Wickeltisch', test: (t) => /^(yes|limited|room|bench)$/.test(t.changing_table || t['toilets:changing_table'] || '') },
+];
+const WC_IDS = new Set(WC_FILTERS.map((f) => f.id));
+const wcTags = (it) => WC_FILTERS.filter((f) => f.test(it.t || {})).map((f) => f.id);
+const wcOk = (it) => it.c !== 'toilette' || !state.wc.size || [...state.wc].every((id) => wcTags(it).includes(id));
 const evOk = (it) => it.c !== 'ladesaeule' || !state.ev.size || evGroups().every((ids) => ids.some((id) => evTags(it).includes(id)));
 
 // ---------- Geldautomaten-Verbünde (Zuordnung über Marke/Betreiber aus den Kartendaten, ohne Gewähr) ----------
@@ -93,6 +103,7 @@ const state = {
   cards: new Set(store.get('cards', []).filter((id) => CARDS.some((c) => c.id === id))), // leer = alle Tankstellen
   atm: new Set(store.get('atm', []).filter((id) => ATM_IDS.has(id))), // Geldautomaten-Verbünde, leer = alle
   ev: new Set(store.get('ev', []).filter((id) => EV_IDS.has(id))), // Ladesäulen-Filter, leer = alle
+  wc: new Set(store.get('wc', []).filter((id) => WC_IDS.has(id))), // Toiletten-Filter, leer = alle
   cont: new Set(store.get('cont', []).filter((id) => ['glas', 'papier', 'altkleider', 'wertstoffhof'].includes(id))),
   park: new Set(store.get('park', []).map((id) => (id === 'mitfahrer' ? 'parkride' : id)).filter((id) => ['rastplatz', 'parkride', 'wanderpark'].includes(id))),
 };
@@ -105,7 +116,7 @@ const fuelOf = (it) => it._fi || (it._fi = fuelInfo(it.t));
 // Mit gewählten Karten: jede gewählte Karte muss „bestätigt“ oder „laut Marke üblich“ sein
 const cardsOk = (it) => state.cards.size === 0 || [...state.cards].every((c) => ['ok', 'likely'].includes(fuelOf(it).cards[c]?.lv));
 const passes = (it) => state.active.has(it.c) && (!PARCEL.includes(it.c) || allProviders() || (it.pv || []).some((p) => state.providers.has(p)))
-  && (it.c !== FUEL || cardsOk(it)) && evOk(it) && atmOk(it);
+  && (it.c !== FUEL || cardsOk(it)) && evOk(it) && atmOk(it) && wcOk(it);
 
 // ---------- Hilfsfunktionen ----------
 function distM(a, b) {
@@ -473,8 +484,21 @@ function renderProviders() {
   const ev = CATEGORY_BY_ID.ladesaeule;
   $('#evrow').hidden = !state.active.has('ladesaeule');
   $('#evrow').innerHTML = EV_FILTERS.map((f, i) => `${i && EV_FILTERS[i - 1].grp !== f.grp ? '<span class="chip-sep" aria-hidden="true"></span>' : ''}<button class="chip pv cd" data-ev="${f.id}" aria-pressed="${state.ev.has(f.id)}" style="--c:${ev.color};--k:${ev.ink}">${esc(f.label)}</button>`).join('');
+  const wc = CATEGORY_BY_ID.toilette;
+  $('#wcrow').hidden = !state.active.has('toilette');
+  $('#wcrow').innerHTML = WC_FILTERS.map((f) => `<button class="chip pv cd" data-wc="${f.id}" aria-pressed="${state.wc.has(f.id)}" style="--c:${wc.color};--k:${wc.ink}">${esc(f.label)}</button>`).join('');
   layoutSheet();
 }
+$('#wcrow').addEventListener('click', (e) => {
+  const b = e.target.closest('.chip[data-wc]');
+  if (!b) return;
+  const id = b.dataset.wc;
+  if (state.wc.has(id)) state.wc.delete(id); else state.wc.add(id); // Mehrfachauswahl, leer = alle
+  store.set('wc', [...state.wc]);
+  renderProviders();
+  applyFilter();
+  if (state.selected && !state.selected.adding && !wcOk(state.selected)) closeDetail(); else if (!state.selected) renderList();
+});
 $('#atmrow').addEventListener('click', (e) => {
   const b = e.target.closest('.chip[data-atm]');
   if (!b) return;
@@ -587,6 +611,7 @@ const geojson = () => fc(state.items.map((it, i) => pointF(it.lon, it.lat, {
   fc: it.c === FUEL ? `|${fuelCardsPassing(fuelOf(it)).join('|')}|` : '',
   ev: it.c === 'ladesaeule' ? `|${evTags(it).join('|')}|` : '',
   an: it.c === 'geldautomat' ? atmNet(it) : '',
+  wf: it.c === 'toilette' ? `|${wcTags(it).join('|')}|` : '',
   u: it.src === 'user' && !isConfirmed(it) ? 1 : 0,
 })));
 
@@ -596,6 +621,7 @@ function applyFilter() {
   if (!allProviders()) conds.push(['any', ['!', ['in', ['get', 'c'], ['literal', PARCEL]]], ...[...state.providers].map((p) => ['in', `|${p}|`, ['get', 'pv']])]);
   if (state.cards.size) conds.push(['any', ['!=', ['get', 'c'], FUEL], ['all', ...[...state.cards].map((c) => ['in', `|${c}|`, ['get', 'fc']])]]);
   if (state.atm.size) conds.push(['any', ['!=', ['get', 'c'], 'geldautomat'], ['in', ['get', 'an'], ['literal', [...state.atm]]]]);
+  if (state.wc.size) conds.push(['any', ['!=', ['get', 'c'], 'toilette'], ['all', ...[...state.wc].map((id) => ['in', `|${id}|`, ['get', 'wf']])]]);
   if (state.ev.size) conds.push(['any', ['!=', ['get', 'c'], 'ladesaeule'], ['all', ...evGroups().map((ids) => ['any', ...ids.map((id) => ['in', `|${id}|`, ['get', 'ev']])])]]);
   map.setFilter('pois', conds.length === 1 ? conds[0] : ['all', ...conds]);
   document.documentElement.dataset.cats = [...state.active].sort().join(','); // für den Klick-Test
@@ -867,7 +893,7 @@ function rowHtml(it, ref) {
   const cat = CATEGORY_BY_ID[it.c];
   const st = reportChips(it)[0] || statusOf(it);
   const sub = subOf(it);
-  return `<div class="row" data-i="${it._i}" data-c="${it.c}" role="button" tabindex="0">
+  return `<div class="row" data-i="${it._i}" data-c="${it.c}"${it.c === 'toilette' ? ` data-wf="${wcTags(it).join(' ')}"` : ''} role="button" tabindex="0">
     <span class="ic" style="--c:${cat.color};--k:${cat.ink}">${cat.icon}</span>
     <span class="main">
       <div class="name">${esc(titleOf(it))}${it.c === FUEL ? appBadge(it) : ''}</div>
