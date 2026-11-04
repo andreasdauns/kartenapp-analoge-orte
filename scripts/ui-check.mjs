@@ -103,8 +103,20 @@ async function run(kind, mobile) {
       await page.locator(`#chips .chip[data-id="${chip.id}"]`).click();
       if (chip.id === 'container') {
         if (await page.locator('#containers').isHidden()) bad(ctx, 'Container-Unterzeile erscheint nicht');
-        const sub = await page.$$eval('#containers .chip', (a) => a.map((b) => b.textContent.trim()));
+        const sub = await page.$$eval('#containers .chip', (a) => a.map((b) => [...b.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim()));
         if (sub.join(',') !== 'Glas,Papier,Altkleider,Wertstoffhöfe') bad(ctx, `Container-Unterzeile falsch: ${sub.join(', ')}`);
+      }
+      if (chip.id === 'parken') {
+        if (await page.locator('#parkrow').isHidden()) bad(ctx, 'Parken-Unterzeile erscheint nicht');
+        const sub = await page.$$eval('#parkrow .chip', (a) => a.map((b) => [...b.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim()));
+        if (sub.join(',') !== 'Raststätten & Rastplätze,Parkplätze,Park & Ride,Mitfahrerparkplätze,Wanderparkplätze') bad(ctx, `Parken-Unterzeile falsch: ${sub.join(', ')}`);
+        // Unterauswahl „Parkplätze“: nur Parkplätze in der Liste
+        await page.locator('#parkrow .chip[data-ct="parkplatz"]').click();
+        await page.waitForTimeout(1500);
+        const icons = await page.$$eval('#sheet-body .row .name', (a) => a.length);
+        if (STRICT && !icons) bad(ctx, 'Unterauswahl „Parkplätze“ zeigt keine Einträge');
+        await page.locator('#parkrow .chip[data-ct="parkplatz"]').click();
+        await page.waitForTimeout(800);
       }
       await page.waitForTimeout(1800);
       if (chip.id === 'geldautomat') {

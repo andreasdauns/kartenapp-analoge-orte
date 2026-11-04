@@ -37,9 +37,29 @@ export const CATEGORIES = [
     icon: txt('WC', 10),
   },
   {
-    id: 'rastplatz', label: 'Rastplatz', plural: 'Rastplätze',
+    id: 'rastplatz', label: 'Raststätte / Rastplatz', plural: 'Raststätten & Rastplätze',
     color: '#1E3A8A', ink: '#FFFFFF',
     icon: txt('P', 15),
+  },
+  {
+    id: 'parkplatz', label: 'Parkplatz', plural: 'Parkplätze',
+    color: '#1565C0', ink: '#FFFFFF',
+    icon: txt('P', 15),
+  },
+  {
+    id: 'parkride', label: 'Park & Ride', plural: 'Park & Ride',
+    color: '#00796B', ink: '#FFFFFF',
+    icon: txt('P+R', 8),
+  },
+  {
+    id: 'mitfahrer', label: 'Mitfahrerparkplatz', plural: 'Mitfahrerparkplätze',
+    color: '#6A1B9A', ink: '#FFFFFF',
+    icon: svg('<circle cx="8" cy="7" r="2.5"/><circle cx="16" cy="7" r="2.5"/><path d="M3.5 19v-2.5A3.5 3.5 0 0 1 7 13h2a3.5 3.5 0 0 1 3.5 3.5M11.5 19v-2.5A3.5 3.5 0 0 1 15 13h2a3.5 3.5 0 0 1 3.5 3.5V19"/>'),
+  },
+  {
+    id: 'wanderpark', label: 'Wanderparkplatz', plural: 'Wanderparkplätze',
+    color: '#33691E', ink: '#FFFFFF',
+    icon: svg('<circle cx="13" cy="4.5" r="2"/><path d="M10 21l2.5-7 3 3V21M8.5 12.5l1.5-4 3-1.5 2.5 3 2.5 1M12 13l-1.5-4.5M6 21l2-5"/>'),
   },
   {
     id: 'tankstelle', label: 'Tankstelle', plural: 'Tankstellen',
@@ -93,6 +113,16 @@ export function classify(tags = {}) {
   if (!noAccess && ((a === 'recycling' && tags.recycling_type === 'centre') || a === 'waste_transfer_station')) out.push('wertstoffhof');
   if (a === 'toilets' && !noAccess) out.push('toilette');
   if (tags.highway === 'rest_area' || tags.highway === 'services') out.push('rastplatz');
+  // Parken: nur öffentlich nutzbare Parkplätze – keine privaten, Kunden-, Anwohner- oder Firmenparkplätze,
+  // keine Parkstreifen am Straßenrand, Carports oder Garagenhöfe
+  const closedAccess = /^(private|no|customers|delivery|permit|residents|employees|destination|agricultural|forestry|military|discouraged)$/;
+  const smallKind = /^(street_side|lane|on_kerb|half_on_kerb|carports|garage_boxes|garages|layby|sheds)$/;
+  if ((a === 'parking' || a === 'car_pooling') && !closedAccess.test(tags.access || '') && !smallKind.test(tags.parking || '') && tags.highway !== 'rest_area' && tags.highway !== 'services') {
+    if (a === 'car_pooling' || tags.park_ride === 'hov' || tags.carpool === 'designated') out.push('mitfahrer');
+    else if (tags.park_ride && tags.park_ride !== 'no') out.push('parkride');
+    else if (yes(tags.hiking) || /wanderpark/i.test(tags.name || '')) out.push('wanderpark');
+    else out.push('parkplatz');
+  }
   const locker = a === 'parcel_locker' || (a === 'vending_machine' && /parcel/.test(tags.vending || ''));
   if (locker) out.push('packstation');
   else if (a === 'post_office' || /^(post_partner|post_annex|bureau|yes)$/.test(tags.post_office || tags['post_office:type'] || '')
@@ -260,7 +290,7 @@ export function fuelInfo(tags = {}) {
 export const fuelCardsPassing = (info) => CARDS.filter((c) => ['ok', 'likely'].includes(info.cards[c.id].lv)).map((c) => c.id);
 
 // Tags, die in die App übernommen werden (der Rest wird verworfen, um die Datei klein zu halten).
-const KEEP_BASE = /^(name|operator|brand|ref|collection_times|opening_hours|fee|charge|wheelchair|changing_table|centralkey|access|check_date.*|survey:date|capacity|recycling_type|recycling:.*|toilets.*|drive_through|description|level|addr:.*|amenity|highway|vending|socket:.*|motorcar|cash_in|indoor|unisex|male|female|post_box:type|parcel_mail_in|parcel_pickup|website|phone|contact:phone|healthcare|dispensing|atm|ref:.*|post_office.*|parcel_locker:.*|payment|autobahn:.*)$/;
+const KEEP_BASE = /^(name|operator|brand|ref|collection_times|opening_hours|fee|charge|wheelchair|changing_table|centralkey|access|check_date.*|survey:date|capacity|recycling_type|recycling:.*|toilets.*|drive_through|description|level|addr:.*|amenity|highway|vending|socket:.*|motorcar|cash_in|indoor|unisex|male|female|post_box:type|parcel_mail_in|parcel_pickup|website|phone|contact:phone|healthcare|dispensing|atm|ref:.*|post_office.*|parcel_locker:.*|payment|autobahn:.*|parking|park_ride|maxstay|capacity:.*|hiking|supervised|carpool|maxheight)$/;
 // Nur bei Tankstellen: angezeigte Kraftstoffe, Tankkarten und Ausstattung
 const KEEP_FUEL = new RegExp(`^(fuel:(diesel|octane_95|e5|e10|octane_98|octane_100|octane_102|lpg|cng|lng|biogas|adblue|HGV_diesel|hgv_diesel|hvo|HVO|hvo100|HVO100|e85|h70|h35|hydrogen)|payment:(${CARDS.flatMap((c) => c.osm).join('|')})|car_wash|shop|compressed_air|hgv|automated)$`);
 export const KEEP_TAG = (k, cats) => KEEP_BASE.test(k) || (Boolean(cats?.includes('tankstelle')) && KEEP_FUEL.test(k));

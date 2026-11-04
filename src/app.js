@@ -93,7 +93,8 @@ const state = {
   cards: new Set(store.get('cards', []).filter((id) => CARDS.some((c) => c.id === id))), // leer = alle Tankstellen
   atm: new Set(store.get('atm', []).filter((id) => ATM_IDS.has(id))), // Geldautomaten-Verbünde, leer = alle
   ev: new Set(store.get('ev', []).filter((id) => EV_IDS.has(id))), // Ladesäulen-Filter, leer = alle
-  cont: new Set(store.get('cont', []).filter((id) => ['glas', 'papier', 'altkleider', 'wertstoffhof'].includes(id))), // leer = alle Container
+  cont: new Set(store.get('cont', []).filter((id) => ['glas', 'papier', 'altkleider', 'wertstoffhof'].includes(id))),
+  park: new Set(store.get('park', []).filter((id) => ['rastplatz', 'parkplatz', 'parkride', 'mitfahrer', 'wanderpark'].includes(id))), // leer = alle Container
 };
 const PROV = Object.fromEntries(PROVIDERS.map((p) => [p.id, p]));
 const PARCEL = ['packstation', 'paketshop'];
@@ -118,23 +119,29 @@ const noteUrl = (it) => `https://www.openstreetmap.org/note/new?lat=${it.lat}&lo
 const jaNein = (v) => ({ yes: 'ja', no: 'nein', limited: 'eingeschränkt', designated: 'ja', only: 'nur' }[v] || v);
 const fmtDate = (s) => { const m = /^(\d{4})-(\d{2})(?:-(\d{2}))?/.exec(s || ''); return m ? (m[3] ? `${m[3]}.${m[2]}.${m[1]}` : `${m[2]}/${m[1]}`) : s; };
 const isContainer = (c) => c === 'glas' || c === 'papier' || c === 'altkleider';
-// Glas, Papier, Altkleider und Wertstoffhöfe erscheinen oben als eine Kategorie „Abfall & Container“ mit Unterauswahl (wie Paketdienste)
-const CONTAINERS = ['glas', 'papier', 'altkleider', 'wertstoffhof']; // Gruppe „Abfall & Container“
-const CONT_LABEL = { glas: 'Glas', papier: 'Papier', altkleider: 'Altkleider', wertstoffhof: 'Wertstoffhöfe' };
-const CONT_GROUP = {
-  id: 'container', plural: 'Abfall & Container', color: '#2F8F4E', ink: '#FFFFFF',
-  icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16l-1.5 12.5h-13z"/><path d="M3 8h18M9 4.5h6v3.5M10 12v5M14 12v5"/></svg>',
-};
-const containersOn = () => CONTAINERS.some((c) => state.active.has(c));
-// Welche Container-Arten aktiv sind, ergibt sich aus der Unterauswahl (leer = alle)
-function syncContainers(on = containersOn()) {
-  CONTAINERS.forEach((c) => state.active.delete(c));
-  if (on) CONTAINERS.filter((c) => !state.cont.size || state.cont.has(c)).forEach((c) => state.active.add(c));
+const PARKING = ['parkplatz', 'parkride', 'mitfahrer', 'wanderpark'];
+const PARK_KIND = { surface: 'ebenerdig', 'multi-storey': 'Parkhaus', underground: 'Tiefgarage', rooftop: 'Parkdeck' };
+// Gruppen-Knöpfe mit Unterzeile (wie Paketdienste): „Abfall & Container“ und „Parken“.
+// Welche Unterarten aktiv sind, ergibt sich aus der Unterauswahl (leer = alle).
+const BIN_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16l-1.5 12.5h-13z"/><path d="M3 8h18M9 4.5h6v3.5M10 12v5M14 12v5"/></svg>';
+const GROUPS = [
+  { id: 'container', plural: 'Abfall & Container', color: '#2F8F4E', ink: '#FFFFFF', icon: BIN_ICON, row: 'containers', key: 'cont',
+    members: ['glas', 'papier', 'altkleider', 'wertstoffhof'], labels: { glas: 'Glas', papier: 'Papier', altkleider: 'Altkleider', wertstoffhof: 'Wertstoffhöfe' } },
+  { id: 'parken', plural: 'Parken', color: '#1E3A8A', ink: '#FFFFFF', icon: CATEGORY_BY_ID.parkplatz.icon, row: 'parkrow', key: 'park',
+    members: ['rastplatz', 'parkplatz', 'parkride', 'mitfahrer', 'wanderpark'],
+    labels: { rastplatz: 'Raststätten & Rastplätze', parkplatz: 'Parkplätze', parkride: 'Park & Ride', mitfahrer: 'Mitfahrerparkplätze', wanderpark: 'Wanderparkplätze' } },
+];
+const GROUP_OF = Object.fromEntries(GROUPS.flatMap((g) => g.members.map((m) => [m, g])));
+const groupSel = (g) => state[g.key];
+const groupOn = (g) => g.members.some((c) => state.active.has(c));
+function syncGroup(g, on = groupOn(g)) {
+  g.members.forEach((c) => state.active.delete(c));
+  if (on) g.members.filter((c) => !groupSel(g).size || groupSel(g).has(c)).forEach((c) => state.active.add(c));
   store.set('cats', [...state.active]);
-  store.set('cont', [...state.cont]);
+  store.set(g.key, [...groupSel(g)]);
 }
-// Alte Auswahl (einzelne Container-Chips) übernehmen
-if (containersOn() && !CONTAINERS.every((c) => state.active.has(c)) && !state.cont.size) CONTAINERS.filter((c) => state.active.has(c)).forEach((c) => state.cont.add(c));
+// Alte Auswahl (einzelne Chips von früher) in die Unterauswahl übernehmen
+for (const g of GROUPS) if (groupOn(g) && !g.members.every((c) => state.active.has(c)) && !groupSel(g).size) g.members.filter((c) => state.active.has(c)).forEach((c) => groupSel(g).add(c));
 
 const NAV = {
   google: { name: 'Google Maps', url: (it) => `https://www.google.com/maps/dir/?api=1&destination=${it.lat},${it.lon}&travelmode=driving` },
@@ -171,7 +178,9 @@ function titleOf(it) {
     case 'apotheke': return t.name || 'Apotheke';
     case 'briefkasten': return 'Briefkasten';
     case 'toilette': return t.name && !/^(wc|toilette)$/i.test(t.name) ? t.name : 'Öffentliche Toilette';
-    case 'rastplatz': return t.name || 'Rastplatz';
+    case 'rastplatz': return t.name || (t.highway === 'services' ? 'Raststätte' : 'Rastplatz');
+    case 'parkplatz': case 'parkride': case 'mitfahrer': case 'wanderpark':
+      return t.name || { 'multi-storey': 'Parkhaus', underground: 'Tiefgarage', rooftop: 'Parkdeck' }[t.parking] || CATEGORY_BY_ID[it.c].label;
     case 'tankstelle': return fuelOf(it).brand?.label || t.brand || t.name || t.operator || 'Tankstelle';
     case 'wertstoffhof': {
       if (t.name && !/^(wertstoffhof|recyclinghof)$/i.test(t.name)) return t.name;
@@ -195,6 +204,9 @@ function subOf(it) {
   if (it.c === FUEL) {
     const title = titleOf(it).toLowerCase();
     parts.push([t.operator, t.brand, t.name].find((v) => v && !v.toLowerCase().includes(title) && !title.includes(v.toLowerCase())));
+  }
+  if (PARKING.includes(it.c)) {
+    parts.push([PARK_KIND[t.parking], t.capacity ? `${t.capacity} Plätze` : null, t.fee === 'no' ? 'kostenlos' : t.fee === 'yes' ? 'kostenpflichtig' : null].filter(Boolean).join(' · '));
   }
   if (it.c === 'ladesaeule') {
     const kw = Math.max(0, ...Object.keys(t).filter((k) => /^socket:.+:output$/.test(k)).map((k) => parseFloat(t[k]) || 0));
@@ -318,6 +330,20 @@ function factsRaw(it) {
     add('Briefmarken', t['post_office:stamps'] ? 'ja' : null);
     add('Öffnungszeiten', weekSummary(parseHours(t.opening_hours)) || t.opening_hours);
   }
+  if (PARKING.includes(it.c)) {
+    const cnt = (v) => (v && !/^(no|0)$/.test(v) ? (v === 'yes' ? 'vorhanden' : v) : null);
+    add('Art', PARK_KIND[t.parking]);
+    add('Park & Ride', it.c === 'parkride' ? ({ train: 'mit Anschluss an die Bahn', bus: 'mit Anschluss an den Bus', tram: 'mit Anschluss an die Straßenbahn', metro: 'mit Anschluss an die U-Bahn', ferry: 'mit Anschluss an die Fähre' }[t.park_ride] || 'ja') : null);
+    add('Gebühr', t.fee === 'no' ? 'kostenlos' : t.fee === 'yes' ? (t.charge || 'kostenpflichtig') : null);
+    add('Stellplätze', t.capacity);
+    add('Behindertenparkplätze', cnt(t['capacity:disabled']));
+    add('Eltern-Kind-Plätze', cnt(t['capacity:parent']));
+    add('Ladeplätze', cnt(t['capacity:charging']));
+    add('Höchstparkdauer', t.maxstay ? t.maxstay.replace(/hours?/, 'Std.').replace(/minutes?/, 'Min.') : null);
+    add('Durchfahrtshöhe', t.maxheight ? `${String(t.maxheight).replace(/\s*m$/, '')} m` : null);
+    add('Öffnungszeiten', weekSummary(parseHours(t.opening_hours)) || t.opening_hours);
+    add('Beachten', 'Angaben laut Kartendaten – es gilt die Beschilderung vor Ort.');
+  }
   if (it.c === 'geldautomat') {
     add('Bank', t.brand || t.operator || t.name);
     { const n = ATM_NETS.find((x) => x.id === atmNet(it)); add('Verbund', n ? `${n.long} – laut Kartendaten, Gebühr zeigt der Automat vorher an` : null); }
@@ -411,15 +437,17 @@ function extraChips(it) {
 
 // ---------- Kategorie-Chips ----------
 function renderChips() {
-  const top = CATEGORIES.filter((c) => !CONTAINERS.includes(c.id) || c.id === CONTAINERS[0]).map((c) => (c.id === CONTAINERS[0] ? CONT_GROUP : c));
+  const top = CATEGORIES.filter((c) => !GROUP_OF[c.id] || GROUP_OF[c.id].members[0] === c.id).map((c) => GROUP_OF[c.id] || c);
   $('#chips').innerHTML = top.map((c) => `
-    <button class="chip" data-id="${c.id}" aria-pressed="${c.id === 'container' ? containersOn() : state.active.has(c.id)}" style="--c:${c.color};--k:${c.ink}">
+    <button class="chip" data-id="${c.id}" aria-pressed="${c.members ? groupOn(c) : state.active.has(c.id)}" style="--c:${c.color};--k:${c.ink}">
       <span class="ic">${c.icon}</span>${esc(c.plural)}
     </button>`).join('') + '<button class="chip wishchip" data-wish="1">Fehlt was?</button>';
 }
 function renderProviders() {
-  $('#containers').hidden = !containersOn();
-  $('#containers').innerHTML = CONTAINERS.map((id) => { const c = CATEGORY_BY_ID[id]; return `<button class="chip pv ct" data-ct="${id}" aria-pressed="${state.cont.has(id)}" style="--c:${c.color};--k:${c.ink}"><span class="ic">${c.icon}</span>${esc(CONT_LABEL[id])}</button>`; }).join('');
+  for (const g of GROUPS) {
+    $('#' + g.row).hidden = !groupOn(g);
+    $('#' + g.row).innerHTML = g.members.map((id) => { const c = CATEGORY_BY_ID[id]; return `<button class="chip pv ct" data-ct="${id}" aria-pressed="${groupSel(g).has(id)}" style="--c:${c.color};--k:${c.ink}"><span class="ic">${c.icon}</span>${esc(g.labels[id])}</button>`; }).join('');
+  }
   const show = PARCEL.some((c) => state.active.has(c));
   $('#providers').hidden = !show;
   $('#providers').innerHTML = PROVIDERS.map((p) => `<button class="chip pv" data-pv="${p.id}" aria-pressed="${state.providers.has(p.id)}">${esc(p.label)}</button>`).join('');
@@ -474,12 +502,12 @@ $('#providers').addEventListener('click', (e) => {
   applyFilter();
   if (!state.selected) renderList();
 });
-$('#containers').addEventListener('click', (e) => {
+for (const g of GROUPS) $('#' + g.row).addEventListener('click', (e) => {
   const b = e.target.closest('.chip[data-ct]');
   if (!b) return;
   const id = b.dataset.ct;
-  if (state.cont.has(id)) state.cont.delete(id); else state.cont.add(id); // Mehrfachauswahl, leer = alle Container
-  syncContainers(true);
+  if (groupSel(g).has(id)) groupSel(g).delete(id); else groupSel(g).add(id); // Mehrfachauswahl, leer = alle
+  syncGroup(g, true);
   renderProviders();
   applyFilter();
   if (state.selected && !state.active.has(state.selected.c)) closeDetail();
@@ -489,7 +517,8 @@ $('#chips').addEventListener('click', (e) => {
   const b = e.target.closest('.chip[data-id]');
   if (!b) return;
   const id = b.dataset.id;
-  if (id === 'container') syncContainers(!containersOn()); // Gruppe an/aus
+  const grp = GROUPS.find((g) => g.id === id);
+  if (grp) syncGroup(grp, !groupOn(grp)); // Gruppe an/aus
   else if (state.active.has(id)) state.active.delete(id); else state.active.add(id); // jede Kategorie einzeln an/aus
   store.set('cats', [...state.active]);
   zoomHint();
@@ -1128,10 +1157,11 @@ function openAdd() {
     $('#crosshair').hidden = true;
     state.selected = null;
     await submit({ place_id: id, category: cat, kind: 'new', lat: +c.lat.toFixed(6), lon: +c.lng.toFixed(6) }, 'Danke! Der Ort ist eingetragen und wartet auf Bestätigung.');
-    if (isContainer(cat) && state.cont.size) state.cont.add(cat);
+    const g = GROUP_OF[cat];
+    if (g && groupSel(g).size) groupSel(g).add(cat);
     state.active.add(cat);
     store.set('cats', [...state.active]);
-    store.set('cont', [...state.cont]);
+    if (g) store.set(g.key, [...groupSel(g)]);
     renderChips(); renderProviders(); applyFilter();
   });
   layoutSheet();
