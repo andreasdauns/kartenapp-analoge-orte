@@ -41,7 +41,7 @@ const NAME_KEYS = ['Betreiber', 'Marke', 'Bank', 'Geschäft', 'Anbieter'];
 async function run(kind, mobile) {
   const engine = { chromium, webkit, firefox }[kind];
   // Firefox hat ohne Grafikkarte (Testserver) WebGL standardmäßig aus → für den Test per Software erzwingen
-  const browser = await engine.launch(kind === 'firefox' ? { firefoxUserPrefs: { 'webgl.force-enabled': true, 'webgl.disabled': false, 'webgl.enable-webgl2': true, 'layers.acceleration.force-enabled': true } } : {});
+  const browser = await engine.launch(kind === 'firefox' ? { headless: !process.env.HEADED_FIREFOX, firefoxUserPrefs: { 'webgl.force-enabled': true, 'webgl.disabled': false, 'webgl.enable-webgl2': true, 'layers.acceleration.force-enabled': true } } : {});
   const label = `${kind}${mobile ? ' Handy' : ' PC'}`;
   for (const place of PLACES) {
     const ctx = `${label} · ${place.name}`;
