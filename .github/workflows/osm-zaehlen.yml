@@ -1,0 +1,43 @@
+name: OSM-Daten zählen (Recherche)
+
+# Zählt in den OSM-Daten für Deutschland, wie oft bestimmte Merkmale vorkommen
+# (z. B. Annahme von Batterien oder Elektro-Kleingeräten). Nur per Hand gestartet, ändert nichts.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  count:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - name: Werkzeuge
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq osmium-tool
+      - name: Deutschland laden
+        run: curl -sSfL --retry 3 -A "analoge-orte (github.com/andreasdauns/kartenapp-analoge-orte)" -o de.pbf https://download.geofabrik.de/europe/germany-latest.osm.pbf
+      - name: Zählen
+        run: |
+          osmium tags-filter de.pbf \
+            'nwr/recycling:*' nwr/amenity=recycling,waste_transfer_station,vending_machine \
+            nwr/emergency=defibrillator nwr/amenity=hospital \
+            -o f.pbf --overwrite
+          {
+            echo "## OSM-Zählung Deutschland ($(date -u +%F))"
+            echo '```'
+            echo "--- recycling:* = yes (alle Objekte, auch Läden)"
+            osmium tags-count f.pbf 'recycling:*=yes' -s count-desc | head -70
+            echo "--- Wertstoffhöfe / Container"
+            osmium tags-count f.pbf recycling_type amenity=waste_transfer_station -s count-desc
+            echo "--- Pfandautomaten"
+            osmium tags-count f.pbf vending=bottle_return
+            echo "--- Läden mit Sammelstelle (shop=* und recycling:batteries=yes)"
+            osmium tags-filter f.pbf nwr/recycling:batteries=yes -o b.pbf --overwrite
+            osmium tags-count b.pbf shop amenity -s count-desc | head -15
+            echo "--- Notfall"
+            osmium tags-count f.pbf emergency=defibrillator access -s count-desc | head -12
+            osmium tags-filter f.pbf nwr/amenity=hospital -o h.pbf --overwrite
+            osmium tags-count h.pbf emergency -s count-desc | head -5
+            echo '```'
+          } | tee -a "$GITHUB_STEP_SUMMARY"
