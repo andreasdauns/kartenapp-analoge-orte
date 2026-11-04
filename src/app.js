@@ -39,6 +39,7 @@ const state = {
   nav: store.get('navApp', null), // google | apple | waze
   providers: new Set(store.get('prov', []).filter((id) => PROVIDERS.some((p) => p.id === id))), // leer = alle Anbieter
   cards: new Set(store.get('cards', []).filter((id) => CARDS.some((c) => c.id === id))), // leer = alle Tankstellen
+  cont: new Set(store.get('cont', []).filter((id) => ['glas', 'papier', 'altkleider'].includes(id))), // leer = alle Container
 };
 const PROV = Object.fromEntries(PROVIDERS.map((p) => [p.id, p]));
 const PARCEL = ['packstation', 'paketshop'];
@@ -63,6 +64,23 @@ const noteUrl = (it) => `https://www.openstreetmap.org/note/new?lat=${it.lat}&lo
 const jaNein = (v) => ({ yes: 'ja', no: 'nein', limited: 'eingeschränkt', designated: 'ja', only: 'nur' }[v] || v);
 const fmtDate = (s) => { const m = /^(\d{4})-(\d{2})(?:-(\d{2}))?/.exec(s || ''); return m ? (m[3] ? `${m[3]}.${m[2]}.${m[1]}` : `${m[2]}/${m[1]}`) : s; };
 const isContainer = (c) => c === 'glas' || c === 'papier' || c === 'altkleider';
+// Glas, Papier und Altkleider erscheinen oben als eine Kategorie „Container“ mit Unterauswahl (wie Paketdienste)
+const CONTAINERS = ['glas', 'papier', 'altkleider'];
+const CONT_LABEL = { glas: 'Glas', papier: 'Papier', altkleider: 'Altkleider' };
+const CONT_GROUP = {
+  id: 'container', plural: 'Container', color: '#2F8F4E', ink: '#FFFFFF',
+  icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16l-1.5 12.5h-13z"/><path d="M3 8h18M9 4.5h6v3.5M10 12v5M14 12v5"/></svg>',
+};
+const containersOn = () => CONTAINERS.some((c) => state.active.has(c));
+// Welche Container-Arten aktiv sind, ergibt sich aus der Unterauswahl (leer = alle)
+function syncContainers(on = containersOn()) {
+  CONTAINERS.forEach((c) => state.active.delete(c));
+  if (on) CONTAINERS.filter((c) => !state.cont.size || state.cont.has(c)).forEach((c) => state.active.add(c));
+  store.set('cats', [...state.active]);
+  store.set('cont', [...state.cont]);
+}
+// Alte Auswahl (einzelne Container-Chips) übernehmen
+if (containersOn() && !CONTAINERS.every((c) => state.active.has(c)) && !state.cont.size) CONTAINERS.filter((c) => state.active.has(c)).forEach((c) => state.cont.add(c));
 
 const NAV = {
   google: { name: 'Google Maps', url: (it) => `https://www.google.com/maps/dir/?api=1&destination=${it.lat},${it.lon}&travelmode=driving` },
@@ -184,9 +202,25 @@ const MATERIAL = {
 };
 const SOCKET = { type2: 'Typ 2', type2_combo: 'CCS', chademo: 'CHAdeMO', schuko: 'Schuko', type2_cable: 'Typ 2 (Kabel)', tesla_supercharger: 'Tesla', type1: 'Typ 1' };
 
+const NAME_KEYS = new Set(['Betreiber', 'Marke', 'Bank', 'Geschäft', 'Anbieter', 'Hinweis']);
+const normTxt = (v) => String(v).toLowerCase().replace(/[^a-z0-9äöüß]+/g, ' ').trim();
 function factsOf(it) {
+  const f = factsRaw(it);
+  // Gleiche Angabe nicht zweimal zeigen: gleiches Feld, oder Name/Betreiber/Marke identisch mit Titel oder einer anderen Angabe
+  const seenKeys = new Set(), seenNames = new Set([normTxt(titleOf(it))]);
+  return f.filter(([k, v, html]) => {
+    if (seenKeys.has(k)) return false;
+    seenKeys.add(k);
+    if (html || !NAME_KEYS.has(k)) return true;
+    const n = normTxt(v);
+    if (!n || seenNames.has(n)) return false;
+    seenNames.add(n);
+    return true;
+  });
+}
+function factsRaw(it) {
   const t = it.t, f = [];
-  const add = (k, v) => { if (v) f.push([k, v]); };
+  const add = (k, v) => { if (v && String(v).trim()) f.push([k, String(v).trim()]); };
   if (it.c === 'briefkasten') {
     add('Leerung', weekSummary(parseHours(t.collection_times, 'points')) || t.collection_times || 'unbekannt');
     add('Zuletzt geprüft', fmtDate(t['check_date:collection_times'] || t.check_date || t['survey:date']));
@@ -322,12 +356,15 @@ function extraChips(it) {
 
 // ---------- Kategorie-Chips ----------
 function renderChips() {
-  $('#chips').innerHTML = CATEGORIES.map((c) => `
-    <button class="chip" data-id="${c.id}" aria-pressed="${state.active.has(c.id)}" style="--c:${c.color};--k:${c.ink}">
+  const top = CATEGORIES.filter((c) => !CONTAINERS.includes(c.id) || c.id === CONTAINERS[0]).map((c) => (c.id === CONTAINERS[0] ? CONT_GROUP : c));
+  $('#chips').innerHTML = top.map((c) => `
+    <button class="chip" data-id="${c.id}" aria-pressed="${c.id === 'container' ? containersOn() : state.active.has(c.id)}" style="--c:${c.color};--k:${c.ink}">
       <span class="ic">${c.icon}</span>${esc(c.plural)}
     </button>`).join('') + '<button class="chip wishchip" data-wish="1">Fehlt was?</button>';
 }
 function renderProviders() {
+  $('#containers').hidden = !containersOn();
+  $('#containers').innerHTML = CONTAINERS.map((id) => { const c = CATEGORY_BY_ID[id]; return `<button class="chip pv ct" data-ct="${id}" aria-pressed="${state.cont.has(id)}" style="--c:${c.color};--k:${c.ink}"><span class="ic">${c.icon}</span>${esc(CONT_LABEL[id])}</button>`; }).join('');
   const show = PARCEL.some((c) => state.active.has(c));
   $('#providers').hidden = !show;
   $('#providers').innerHTML = PROVIDERS.map((p) => `<button class="chip pv" data-pv="${p.id}" aria-pressed="${state.providers.has(p.id)}">${esc(p.label)}</button>`).join('');
@@ -356,11 +393,23 @@ $('#providers').addEventListener('click', (e) => {
   applyFilter();
   if (!state.selected) renderList();
 });
+$('#containers').addEventListener('click', (e) => {
+  const b = e.target.closest('.chip[data-ct]');
+  if (!b) return;
+  const id = b.dataset.ct;
+  if (state.cont.has(id)) state.cont.delete(id); else state.cont.add(id); // Mehrfachauswahl, leer = alle Container
+  syncContainers(true);
+  renderProviders();
+  applyFilter();
+  if (state.selected && !state.active.has(state.selected.c)) closeDetail();
+  else if (!state.selected) renderList();
+});
 $('#chips').addEventListener('click', (e) => {
   const b = e.target.closest('.chip[data-id]');
   if (!b) return;
   const id = b.dataset.id;
-  if (state.active.has(id)) state.active.delete(id); else state.active.add(id); // jede Kategorie einzeln an/aus
+  if (id === 'container') syncContainers(!containersOn()); // Gruppe an/aus
+  else if (state.active.has(id)) state.active.delete(id); else state.active.add(id); // jede Kategorie einzeln an/aus
   store.set('cats', [...state.active]);
   zoomHint();
   renderChips();
@@ -598,12 +647,16 @@ function peekHeight() {
   const last = rows[Math.min(PEEK_ROWS, rows.length) - 1] || body.lastElementChild;
   if (!last) return 120;
   const bottom = last.getBoundingClientRect().bottom - body.getBoundingClientRect().top + body.scrollTop;
-  return Math.min(sheetMax(), Math.round($('#grip').offsetHeight + bottom + 10 + (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-bottom')) || 0)));
+  return Math.min(sheetMax(), Math.round($('#grip').offsetHeight + bottom + (isStaticSheet() ? 2 : 10) + (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--safe-bottom')) || 0)));
 }
 function setVisible(px) {
   document.documentElement.style.setProperty('--sheet-h', `${px}px`);
 }
+const isStaticSheet = () => !state.selected && !body.querySelector('.row'); // Hinweis-Karten ohne Liste: nicht hochziehbar
 function layoutSheet() {
+  const still = isStaticSheet();
+  sheet.classList.toggle('static', still);
+  if (still) state.mode = 'peek';
   const full = state.mode === 'full' && !state.selected;
   const h = wide() ? sheet.offsetHeight : full ? sheetMax() : peekHeight();
   sheet.classList.toggle('peek', !full && !state.selected);
@@ -622,7 +675,7 @@ addEventListener('resize', layoutSheet);
 
 let drag = null, suppressClick = false;
 sheet.addEventListener('pointerdown', (e) => {
-  if (wide() || state.selected?.adding) return; // beim Eintragen nicht ziehen, damit das Formular nicht verschwindet
+  if (wide() || state.selected?.adding || isStaticSheet()) return; // beim Eintragen bzw. bei Hinweis-Karten nicht ziehen
   const handle = e.target.closest('.grip, .sheet-h, .detail-h');
   const peekAnywhere = state.mode === 'peek' && !e.target.closest('a, button, .go');
   if (!handle && !peekAnywhere) return;
@@ -665,6 +718,7 @@ sheet.addEventListener('click', (e) => { if (suppressClick) { e.stopPropagation(
 $('#grip').addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') toggleSheet(); });
 function toggleSheet() {
   if (state.selected) { closeDetail(); return; }
+  if (isStaticSheet()) return;
   state.mode = state.mode === 'full' ? 'peek' : 'full';
   if (state.mode === 'peek') body.scrollTop = 0;
   layoutSheet();
@@ -729,11 +783,11 @@ function renderList() {
     return;
   }
   if (!state.active.size) {
-    body.innerHTML = '<div class="sheet-h"><h2>Was suchst du?</h2></div><div class="empty">Tippe oben auf eine oder mehrere Kategorien, z. B. Briefkästen oder Glascontainer.</div>';
+    body.innerHTML = '<div class="sheet-h"><h2>Was suchst du?</h2></div><div class="empty">Tippe oben auf eine oder mehrere Kategorien, z. B. Briefkästen oder Container.</div>';
     layoutSheet();
     return;
   }
-  const only = state.active.size === 1 ? CATEGORY_BY_ID[[...state.active][0]].plural : [...state.active].every((c) => PARCEL.includes(c)) ? 'Paketstellen' : 'Orte';
+  const only = state.active.size === 1 ? CATEGORY_BY_ID[[...state.active][0]].plural : [...state.active].every((c) => PARCEL.includes(c)) ? 'Paketstellen' : [...state.active].every(isContainer) ? 'Container' : 'Orte';
   const loadingHere = keysAround(ref.lat, ref.lon, 0).some((k) => state.loading.has(k));
   const empty = loadingHere ? 'Orte werden geladen …' : (tileKey(ref.lat, ref.lon) in state.index.tiles ? 'In der Nähe ist nichts eingetragen.' : 'Dieses Gebiet ist noch nicht in der App (bisher: ' + state.index.regions.join(', ') + ').');
   body.innerHTML = `
@@ -766,7 +820,7 @@ function openDetail(it, fly = false) {
   body.innerHTML = `<div class="detail">
     <div class="detail-h">
       <span class="ic" style="--c:${cat.color};--k:${cat.ink}">${cat.icon}</span>
-      <div><div class="cat">${esc([fmtDist(distM(ref, it)) + (ref.mine ? '' : ' ab Kartenmitte'), sub].filter(Boolean).join(' · '))}</div><h2>${esc(titleOf(it))}</h2></div>
+      <div><div class="cat">${esc(fmtDist(distM(ref, it)) + (ref.mine ? '' : ' ab Kartenmitte'))}</div><h2>${esc(titleOf(it))}</h2></div>
       <button class="close" id="close" aria-label="Schließen">${ICON_X}</button>
     </div>
     ${chips.length ? `<div class="status-line">${chips.map((c) => `<span class="st ${c.cls}">${esc(c.text)}</span>`).join('')}</div>` : ''}
@@ -986,9 +1040,11 @@ function openAdd() {
     $('#crosshair').hidden = true;
     state.selected = null;
     await submit({ place_id: id, category: cat, kind: 'new', lat: +c.lat.toFixed(6), lon: +c.lng.toFixed(6) }, 'Danke! Der Ort ist eingetragen und wartet auf Bestätigung.');
+    if (isContainer(cat) && state.cont.size) state.cont.add(cat);
     state.active.add(cat);
     store.set('cats', [...state.active]);
-    renderChips(); applyFilter();
+    store.set('cont', [...state.cont]);
+    renderChips(); renderProviders(); applyFilter();
   });
   layoutSheet();
 }
@@ -1110,7 +1166,20 @@ async function init() {
     const extra = Object.entries(state.index.sources || {}).filter(([k]) => k !== 'osm')
       .map(([, v]) => `<a href="${safeUrl(v.url)}" target="_blank" rel="noopener">${esc(v.name)}</a> (${esc(v.license)})`);
     map.addControl(new maplibregl.AttributionControl({ compact: true, customAttribution: '<a href="info.html">Impressum · Datenschutz · Nutzung</a>' + (extra.length ? ' · Weitere Daten: ' + extra.join(', ') : '') }), 'bottom-left');
-    setTimeout(() => document.querySelector('.maplibregl-ctrl-attrib')?.classList.remove('maplibregl-compact-show'), 1500);
+    // Ausführliche Quellenangabe von Anfang an eingeklappt (sonst blitzt der große Kasten beim Start auf).
+    // Die Kurzform „© OpenStreetMap“ + Impressum bleibt dauerhaft sichtbar (OSMF Attribution Guidelines).
+    const attrib = document.querySelector('.maplibregl-ctrl-attrib');
+    attrib?.classList.remove('maplibregl-compact-show');
+    attrib?.removeAttribute('open');
+    map.addControl({
+      onAdd() {
+        const el = document.createElement('div');
+        el.className = 'maplibregl-ctrl mini-attrib';
+        el.innerHTML = '<a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap</a> · <a href="info.html#impressum">Impressum</a>';
+        return el;
+      },
+      onRemove() {},
+    }, 'bottom-left');
     const g = new Date(state.index.generated);
     body.innerHTML = '<div class="empty">Orte werden geladen …</div>';
     layoutSheet();
