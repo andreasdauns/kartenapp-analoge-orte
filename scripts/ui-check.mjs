@@ -41,17 +41,25 @@ const NAME_KEYS = ['Betreiber', 'Marke', 'Bank', 'Geschäft', 'Anbieter'];
 async function run(kind, mobile) {
   const engine = { chromium, webkit, firefox }[kind];
   // Firefox hat ohne Grafikkarte (Testserver) WebGL standardmäßig aus → für den Test per Software erzwingen
-  const browser = await engine.launch(kind === 'firefox' ? { headless: !process.env.HEADED_FIREFOX, firefoxUserPrefs: { 'webgl.force-enabled': true, 'webgl.disabled': false, 'webgl.enable-webgl2': true, 'layers.acceleration.force-enabled': true } } : {});
+  // Firefox: WebGL per Software; Standort über Firefox' eigenen Test-Standortdienst (Playwright-Emulation greift dort nicht zuverlässig).
+  // Firefox wird deshalb je Ort neu gestartet und nur in einer Stadt geprüft (spart Zeit).
+  const ffLaunch = (place) => engine.launch({ headless: !process.env.HEADED_FIREFOX, firefoxUserPrefs: {
+    'webgl.force-enabled': true, 'webgl.disabled': false, 'webgl.enable-webgl2': true, 'layers.acceleration.force-enabled': true,
+    'geo.prompt.testing': true, 'geo.prompt.testing.allow': true, 'geo.enabled': true,
+    'geo.provider.network.url': `data:application/json,{"location":{"lat":${place.lat},"lng":${place.lon}},"accuracy":20}`,
+  } });
+  let browser = kind === 'firefox' ? null : await engine.launch();
   const label = `${kind}${mobile ? ' Handy' : ' PC'}`;
-  for (const place of PLACES) {
+  for (const place of kind === 'firefox' ? PLACES.slice(1, 2) : PLACES) {
+    if (kind === 'firefox') { if (browser) await browser.close(); browser = await ffLaunch(place); }
     const ctx = `${label} · ${place.name}`;
     const context = await browser.newContext({
       viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 860 },
       ...(mobile && kind !== 'firefox' ? { isMobile: true, hasTouch: true } : {}),
-      geolocation: { latitude: place.lat, longitude: place.lon }, permissions: kind === 'webkit' ? [] : ['geolocation'],
+      ...(kind === 'firefox' ? {} : { geolocation: { latitude: place.lat, longitude: place.lon }, permissions: kind === 'webkit' ? [] : ['geolocation'] }),
       locale: 'de-DE',
     });
-    if (kind !== 'chromium') await context.grantPermissions(['geolocation']).catch(() => {});
+    if (kind === 'webkit') await context.grantPermissions(['geolocation']).catch(() => {});
     // Hintergrundkarte durch eine leere ersetzen (wir testen die App, nicht den Kartendienst); Datenbank-Abrufe leer beantworten
     await context.route(/openfreemap\.org/, (r) => (r.request().url().includes('/styles/') ? r.fulfill({ contentType: 'application/json', body: BLANK_STYLE }) : r.abort()));
     await context.route(/supabase\.co/, (r) => r.fulfill({ contentType: 'application/json', body: '[]' }));
