@@ -107,6 +107,18 @@ async function run(kind, mobile) {
         if (sub.join(',') !== 'Glas,Papier,Altkleider,Wertstoffhöfe') bad(ctx, `Container-Unterzeile falsch: ${sub.join(', ')}`);
       }
       await page.waitForTimeout(1800);
+      if (chip.id === 'geldautomat') {
+        if (await page.locator('#atmrow').isHidden()) bad(ctx, 'Geldautomaten-Filterzeile erscheint nicht');
+        else {
+          await page.locator('#atmrow .chip[data-atm="spk"]').click();
+          await page.waitForTimeout(1500);
+          const names = await page.$$eval('#sheet-body .row .sub', (a) => a.slice(0, 6).map((x) => x.textContent));
+          const off = names.filter((t) => !/sparkasse|bw[- ]?bank|baden-württ/i.test(t));
+          if (off.length) bad(ctx, `Filter „Sparkasse“ zeigt andere Automaten: ${off.slice(0, 2).join(' | ')}`);
+          await page.locator('#atmrow .chip[data-atm="spk"]').click();
+          await page.waitForTimeout(800);
+        }
+      }
       if (chip.id === 'ladesaeule') {
         if (await page.locator('#evrow').isHidden()) bad(ctx, 'Ladesäulen-Filterzeile erscheint nicht');
         else {

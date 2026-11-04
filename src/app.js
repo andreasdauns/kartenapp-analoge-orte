@@ -65,6 +65,18 @@ function evGroups() {
 }
 const evOk = (it) => it.c !== 'ladesaeule' || !state.ev.size || evGroups().every((ids) => ids.some((id) => evTags(it).includes(id)));
 
+// ---------- Geldautomaten-Verbünde (Zuordnung über Marke/Betreiber aus den Kartendaten, ohne Gewähr) ----------
+const ATM_NETS = [
+  { id: 'spk', label: 'Sparkasse', long: 'Sparkassen', re: /sparkasse|\bbw[- ]?bank\b|baden-württembergische bank/i },
+  { id: 'vr', label: 'Volksbank/Raiffeisen', long: 'Volks- und Raiffeisenbanken (BankCard ServiceNetz)', re: /volksbank|raiffeisen|\bvr[- ]?bank|\bbbbank\b|\bpsd\b/i },
+  { id: 'cg', label: 'Cash Group', long: 'Cash Group (Deutsche Bank, Commerzbank, HypoVereinsbank, Postbank)', re: /deutsche bank|commerzbank|hypovereinsbank|\bhvb\b|unicredit|postbank|comdirect/i },
+  { id: 'cp', label: 'CashPool', long: 'CashPool (u. a. Sparda, Targobank, Santander)', re: /sparda|targobank|santander|oldenburgische landesbank|\bolb\b|national-bank/i },
+  { id: 'free', label: 'Unabhängige', long: 'Unabhängiger Betreiber – meist mit Gebühr', re: /euronet|cashzone|ic ?cash|cardpoint|your ?cash|travelex/i },
+];
+const ATM_IDS = new Set(ATM_NETS.map((n) => n.id));
+const atmNet = (it) => { if (it._atm !== undefined) return it._atm; const s = `${it.t.brand || ''} ${it.t.operator || ''} ${it.t.name || ''} ${it.t.network || ''}`; return (it._atm = ATM_NETS.find((n) => n.re.test(s))?.id || ''); };
+const atmOk = (it) => it.c !== 'geldautomat' || !state.atm.size || state.atm.has(atmNet(it));
+
 const state = {
   index: null,
   items: [],
@@ -79,6 +91,7 @@ const state = {
   nav: store.get('navApp', null), // google | apple | waze
   providers: new Set(store.get('prov', []).filter((id) => PROVIDERS.some((p) => p.id === id))), // leer = alle Anbieter
   cards: new Set(store.get('cards', []).filter((id) => CARDS.some((c) => c.id === id))), // leer = alle Tankstellen
+  atm: new Set(store.get('atm', []).filter((id) => ATM_IDS.has(id))), // Geldautomaten-Verbünde, leer = alle
   ev: new Set(store.get('ev', []).filter((id) => EV_IDS.has(id))), // Ladesäulen-Filter, leer = alle
   cont: new Set(store.get('cont', []).filter((id) => ['glas', 'papier', 'altkleider', 'wertstoffhof'].includes(id))), // leer = alle Container
 };
@@ -91,7 +104,7 @@ const fuelOf = (it) => it._fi || (it._fi = fuelInfo(it.t));
 // Mit gewählten Karten: jede gewählte Karte muss „bestätigt“ oder „laut Marke üblich“ sein
 const cardsOk = (it) => state.cards.size === 0 || [...state.cards].every((c) => ['ok', 'likely'].includes(fuelOf(it).cards[c]?.lv));
 const passes = (it) => state.active.has(it.c) && (!PARCEL.includes(it.c) || allProviders() || (it.pv || []).some((p) => state.providers.has(p)))
-  && (it.c !== FUEL || cardsOk(it)) && evOk(it);
+  && (it.c !== FUEL || cardsOk(it)) && evOk(it) && atmOk(it);
 
 // ---------- Hilfsfunktionen ----------
 function distM(a, b) {
@@ -307,6 +320,7 @@ function factsRaw(it) {
   }
   if (it.c === 'geldautomat') {
     add('Bank', t.brand || t.operator || t.name);
+    { const n = ATM_NETS.find((x) => x.id === atmNet(it)); add('Verbund', n ? `${n.long} – laut Kartendaten, Gebühr zeigt der Automat vorher an` : null); }
     if (t.amenity === 'bank') add('Standort', 'in der Bankfiliale');
     add('Öffnungszeiten', weekSummary(parseHours(t.opening_hours)) || t.opening_hours);
     add('Einzahlen', jaNein(t.cash_in));
@@ -412,11 +426,24 @@ function renderProviders() {
   const fuel = CATEGORY_BY_ID[FUEL];
   $('#cards').hidden = !state.active.has(FUEL);
   $('#cards').innerHTML = CARDS.map((c) => `<button class="chip pv cd" data-card="${c.id}" aria-pressed="${state.cards.has(c.id)}" style="--c:${fuel.color};--k:${fuel.ink}">${esc(c.label)}</button>`).join('');
+  const atm = CATEGORY_BY_ID.geldautomat;
+  $('#atmrow').hidden = !state.active.has('geldautomat');
+  $('#atmrow').innerHTML = ATM_NETS.map((n) => `<button class="chip pv cd" data-atm="${n.id}" aria-pressed="${state.atm.has(n.id)}" style="--c:${atm.color};--k:${atm.ink}">${esc(n.label)}</button>`).join('');
   const ev = CATEGORY_BY_ID.ladesaeule;
   $('#evrow').hidden = !state.active.has('ladesaeule');
   $('#evrow').innerHTML = EV_FILTERS.map((f, i) => `${i && EV_FILTERS[i - 1].grp !== f.grp ? '<span class="chip-sep" aria-hidden="true"></span>' : ''}<button class="chip pv cd" data-ev="${f.id}" aria-pressed="${state.ev.has(f.id)}" style="--c:${ev.color};--k:${ev.ink}">${esc(f.label)}</button>`).join('');
   layoutSheet();
 }
+$('#atmrow').addEventListener('click', (e) => {
+  const b = e.target.closest('.chip[data-atm]');
+  if (!b) return;
+  const id = b.dataset.atm;
+  if (state.atm.has(id)) state.atm.delete(id); else state.atm.add(id); // Mehrfachauswahl, leer = alle
+  store.set('atm', [...state.atm]);
+  renderProviders();
+  applyFilter();
+  if (state.selected && !state.selected.adding && !atmOk(state.selected)) closeDetail(); else if (!state.selected) renderList();
+});
 $('#evrow').addEventListener('click', (e) => {
   const b = e.target.closest('.chip[data-ev]');
   if (!b) return;
@@ -515,6 +542,7 @@ const geojson = () => fc(state.items.map((it, i) => pointF(it.lon, it.lat, {
   c: it.c, i, pv: it.pv ? `|${it.pv.join('|')}|` : '',
   fc: it.c === FUEL ? `|${fuelCardsPassing(fuelOf(it)).join('|')}|` : '',
   ev: it.c === 'ladesaeule' ? `|${evTags(it).join('|')}|` : '',
+  an: it.c === 'geldautomat' ? atmNet(it) : '',
   u: it.src === 'user' && !isConfirmed(it) ? 1 : 0,
 })));
 
@@ -523,6 +551,7 @@ function applyFilter() {
   const conds = [['in', ['get', 'c'], ['literal', [...state.active]]]];
   if (!allProviders()) conds.push(['any', ['!', ['in', ['get', 'c'], ['literal', PARCEL]]], ...[...state.providers].map((p) => ['in', `|${p}|`, ['get', 'pv']])]);
   if (state.cards.size) conds.push(['any', ['!=', ['get', 'c'], FUEL], ['all', ...[...state.cards].map((c) => ['in', `|${c}|`, ['get', 'fc']])]]);
+  if (state.atm.size) conds.push(['any', ['!=', ['get', 'c'], 'geldautomat'], ['in', ['get', 'an'], ['literal', [...state.atm]]]]);
   if (state.ev.size) conds.push(['any', ['!=', ['get', 'c'], 'ladesaeule'], ['all', ...evGroups().map((ids) => ['any', ...ids.map((id) => ['in', `|${id}|`, ['get', 'ev']])])]]);
   map.setFilter('pois', conds.length === 1 ? conds[0] : ['all', ...conds]);
 }
