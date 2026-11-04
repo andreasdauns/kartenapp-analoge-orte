@@ -37,6 +37,7 @@
     <nav class="chips prov" id="atmrow" aria-label="Geldautomaten-Verbünde" hidden></nav>
     <nav class="chips prov" id="evrow" aria-label="Ladesäulen-Filter" hidden></nav>
     <nav class="chips prov" id="wcrow" aria-label="Toiletten-Filter" hidden></nav>
+    <nav class="chips prov roundbar" id="roundbar" aria-label="Erledigungs-Runde" hidden></nav>
   </header>
 
   <div class="crosshair" id="crosshair" hidden aria-hidden="true"></div>
@@ -122,6 +123,23 @@
       <button class="btn primary" id="wish-send" disabled>Abschicken</button>
       <a class="link wish-mail" id="wish-mail" href="#">Etwas anderes? Schreib uns eine E-Mail ↗</a>
       <button class="link" id="wish-close">Schließen</button>
+    </div>
+  </div>
+
+  <div class="chooser" id="round" hidden>
+    <div class="chooser-card wish-card round-card" role="dialog" aria-modal="true" aria-labelledby="round-h">
+      <h2 id="round-h">Erledigungs-Runde 🦊</h2>
+      <div id="round-form">
+        <p>Was willst du erledigen? Nahfuchs sucht die kürzeste Runde ab deinem Standort.</p>
+        <div class="wish-chips" id="round-tasks"></div>
+        <p class="round-note" id="round-hint"></p>
+        <div class="wish-sec">Wie bist du unterwegs?</div>
+        <div class="wish-chips" id="round-modes"></div>
+        <div class="wish-chips" id="round-back"></div>
+        <button class="btn primary" id="round-plan" disabled>Runde planen</button>
+      </div>
+      <div id="round-res" hidden></div>
+      <button class="link" id="round-close">Schließen</button>
     </div>
   </div>
 

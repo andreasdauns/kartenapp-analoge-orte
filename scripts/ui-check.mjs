@@ -251,6 +251,126 @@ async function groupCheck(page, ctx, chip, row) {
   if (miss.length) bad(ctx, `${chip.text}: nach erneutem Einschalten fehlen ${miss.join(', ')}`);
 }
 
+// Erledigungs-Runde: Rechenkern gegen Durchprobieren aller Möglichkeiten prüfen
+async function roundUnitCheck() {
+  const { planRound, googleRoundUrl, distM } = await import('../src/round.js');
+  const ctx = 'Erledigungs-Runde (Rechnung)';
+  let seed = 7; const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+  const start = { lat: 50.5446, lon: 7.1136 };
+  const mk = (c, n) => Array.from({ length: n }, (_, i) => ({ id: `${c}${i}`, c, lat: start.lat + (rnd() - 0.5) * 0.03, lon: start.lon + (rnd() - 0.5) * 0.045, t: {} }));
+  for (let run = 0; run < 25; run++) {
+    const items = [...mk('briefkasten', 5), ...mk('geldautomat', 4), ...mk('glas', 4)];
+    const back = run % 2 === 0;
+    const p = planRound({ items, start, taskIds: ['brief', 'geld', 'glas'], mode: 'driving', back });
+    // Vergleich: alle Kombinationen und Reihenfolgen
+    const B = items.filter((i) => i.c === 'briefkasten'), G = items.filter((i) => i.c === 'geldautomat'), L = items.filter((i) => i.c === 'glas');
+    let best = Infinity;
+    const orders = [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]];
+    for (const b of B) for (const g of G) for (const l of L) for (const o of orders) {
+      const pts = [b, g, l]; let d = 0, prev = start;
+      for (const i of o) { d += distM(prev, pts[i]); prev = pts[i]; }
+      if (back) d += distM(prev, start);
+      best = Math.min(best, d);
+    }
+    if (p.stops.length !== 3) { bad(ctx, `Lauf ${run}: ${p.stops.length} statt 3 Stopps`); continue; }
+    if (Math.abs(p.totalM - best) > 1) bad(ctx, `Lauf ${run}: Runde ${Math.round(p.totalM)} m, beste mögliche ${Math.round(best)} m`);
+    const cats = p.stops.map((s) => s.item.c).sort().join(',');
+    if (cats !== 'briefkasten,geldautomat,glas') bad(ctx, `Lauf ${run}: falsche Stopps ${cats}`);
+  }
+  // Fehlende Kategorie, Umkreis, Filter
+  const far = [{ id: 'x', c: 'glas', lat: start.lat + 0.2, lon: start.lon, t: {} }, { id: 'y', c: 'briefkasten', lat: start.lat + 0.001, lon: start.lon, t: {} }];
+  const p2 = planRound({ items: far, start, taskIds: ['brief', 'glas'], mode: 'walking' });
+  if (p2.stops.length !== 1 || p2.missing[0]?.id !== 'glas') bad(ctx, 'Ort außerhalb des Umkreises wurde nicht als „nicht gefunden“ gemeldet');
+  const p3 = planRound({ items: far, start, taskIds: ['brief'], ok: () => false });
+  if (p3.stops.length) bad(ctx, 'Filter (z. B. „geschlossen“) wird ignoriert');
+  const p4 = planRound({ items: [], start, taskIds: ['brief', 'geld', 'glas', 'papier', 'kleider', 'wc'] });
+  if (p4.missing.length > 4) bad(ctx, 'Mehr als 4 Erledigungen angenommen');
+  const url = googleRoundUrl([{ item: { lat: 1, lon: 2 } }, { item: { lat: 3, lon: 4 } }, { item: { lat: 5, lon: 6 } }], 'walking');
+  const u = new URL(url);
+  if (u.searchParams.get('destination') !== '5,6' || u.searchParams.get('waypoints') !== '1,2|3,4' || u.searchParams.get('travelmode') !== 'walking' || u.searchParams.has('origin')) bad(ctx, `Google-Link falsch: ${url}`);
+}
+await roundUnitCheck();
+
+// Erledigungs-Runde in der App: auswählen, planen, Liste, Karte, Google-Link, beenden – auf kleinem Handy mit großer Schrift
+async function roundCheck() {
+  const browser = await chromium.launch();
+  for (const zoom of [1, 1.35]) {
+    const ctx = `Erledigungs-Runde · Schrift ${Math.round(zoom * 100)} %`;
+    const context = await browser.newContext({ viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true, geolocation: { latitude: PLACES[0].lat, longitude: PLACES[0].lon }, permissions: ['geolocation'], locale: 'de-DE', timezoneId: 'Europe/Berlin' });
+    await context.route(/openfreemap\.org/, (r) => (r.request().url().includes('/styles/') ? r.fulfill({ contentType: 'application/json', body: BLANK_STYLE }) : r.abort()));
+    await context.route(/supabase\.co/, (r) => r.fulfill({ contentType: 'application/json', body: '[]' }));
+    await context.addInitScript((z) => { try { localStorage.clear(); localStorage.setItem('welcomed', '1'); localStorage.setItem('supportHidden', '1'); } catch { /* */ } document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.zoom = String(z); }); }, zoom);
+    const page = await context.newPage();
+    page.on('pageerror', (e) => { if (!/WebGL/.test(e.message)) bad(ctx, `JavaScript-Fehler: ${e.message}`); });
+    await page.clock.setFixedTime(new Date('2026-11-04T10:30:00+01:00')); // Mittwochvormittag: Container und Geschäfte offen
+    await page.goto(BASE);
+    await page.waitForTimeout(2500);
+    const visible = async (sel) => page.evaluate((q) => {
+      const b = document.querySelector(q); if (!b) return 'fehlt';
+      b.scrollIntoView({ block: 'nearest' });
+      const r = b.getBoundingClientRect();
+      if (r.bottom > innerHeight + 1 || r.top < 0 || r.height === 0) return 'außerhalb des Bildschirms';
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return hit === b || b.contains(hit) ? 'ok' : 'verdeckt';
+    }, sel);
+    // Bei vergrößerter Schrift (CSS-Zoom) verrechnet sich Playwright bei Klick-Koordinaten → per Skript tippen; Erreichbarkeit prüft visible()
+    const tap = (sel) => page.locator(sel).first().evaluate((el) => el.click());
+    const chip = page.locator('#chips .roundchip');
+    if (!(await chip.count())) { bad(ctx, 'Knopf „Erledigungs-Runde“ fehlt'); await context.close(); continue; }
+    await tap('#chips .roundchip');
+    await page.waitForTimeout(400);
+    if (await page.locator('#round').isHidden()) { bad(ctx, 'Fenster öffnet nicht'); await context.close(); continue; }
+    if ((await page.locator('#round-plan').isDisabled()) !== true) bad(ctx, '„Runde planen“ ohne Auswahl aktiv');
+    for (const t of ['brief', 'geld', 'glas', 'papier']) await tap(`#round-tasks [data-task="${t}"]`);
+    if (!(await page.locator('#round-tasks [data-task="kleider"]').isDisabled())) bad(ctx, 'Mehr als 4 Erledigungen wählbar');
+    await tap('#round-tasks [data-task="papier"]'); // wieder ab → 3
+    if (await page.locator('#round-tasks [data-task="kleider"]').isDisabled()) bad(ctx, 'Nach Abwählen bleibt Auswahl gesperrt');
+    await tap('#round-modes [data-mode="driving"]');
+    if ((await page.locator('#round-modes [data-mode="driving"]').getAttribute('aria-pressed')) !== 'true') bad(ctx, 'Auswahl „Auto“ wird nicht gedrückt');
+    const pv = await visible('#round-plan');
+    if (pv !== 'ok') bad(ctx, `„Runde planen“ ${pv}`);
+    await tap('#round-plan');
+    await page.waitForSelector('#round-res:not([hidden])', { timeout: 15000 }).catch(() => bad(ctx, 'Kein Ergebnis'));
+    const stops = await page.locator('.round-list li').count();
+    if (!(await page.locator('#round-form').isHidden())) bad(ctx, 'Auswahl bleibt über dem Ergebnis stehen');
+    if (stops !== 3) bad(ctx, `${stops} statt 3 Stopps (Text: ${(await page.locator('#round-res').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 120)})`);
+    const txt = await page.locator('#round-res').innerText().catch(() => '');
+    if (/undefined|null|NaN|\[object/.test(txt)) bad(ctx, `Ergebnis enthält undefined/NaN: ${txt.slice(0, 120)}`);
+    const href = await page.locator('#round-go').getAttribute('href').catch(() => null);
+    if (!href) bad(ctx, 'Google-Maps-Link fehlt');
+    else {
+      const u = new URL(href);
+      const wp = (u.searchParams.get('waypoints') || '').split('|').filter(Boolean).length;
+      if (u.searchParams.has('origin')) bad(ctx, 'Google-Link enthält den eigenen Standort');
+      if (wp !== Math.max(0, stops - 1) || !u.searchParams.get('destination') || u.searchParams.get('travelmode') !== 'driving') bad(ctx, `Google-Link passt nicht zur Runde: ${href}`);
+    }
+    const gv = await visible('#round-go');
+    if (gv !== 'ok') bad(ctx, `Knopf „Google Maps“ ${gv}`);
+    const mv = await visible('#round-map');
+    if (mv !== 'ok') bad(ctx, `Knopf „Auf der Karte zeigen“ ${mv}`);
+    await tap('#round-map');
+    await page.waitForTimeout(900);
+    if (!(await page.locator('#round').isHidden())) bad(ctx, 'Fenster schließt nach „Auf der Karte“ nicht');
+    const mk = await page.locator('.round-mk').count();
+    if (mk !== stops) bad(ctx, `${mk} Nummern auf der Karte statt ${stops}`);
+    if (await page.locator('#roundbar').isHidden()) bad(ctx, 'Runden-Leiste erscheint nicht');
+    await tap('#rb-list');
+    await page.waitForTimeout(400);
+    if (await page.locator('#round').isHidden()) bad(ctx, '„Liste“ öffnet die Runde nicht wieder');
+    if ((await page.locator('.round-list li').count()) !== stops) bad(ctx, '„Liste“ zeigt die Stopps nicht');
+    await tap('#round-edit');
+    if (await page.locator('#round-form').isHidden()) bad(ctx, '„Erledigungen ändern“ zeigt die Auswahl nicht');
+    await tap('#round-close');
+    await tap('#rb-x');
+    await page.waitForTimeout(400);
+    if (await page.locator('.round-mk').count()) bad(ctx, 'Nummern bleiben nach „Runde beenden“ auf der Karte');
+    if (!(await page.locator('#roundbar').isHidden())) bad(ctx, 'Runden-Leiste bleibt nach „Runde beenden“');
+    await context.close();
+  }
+  await browser.close();
+}
+await roundCheck();
+
 // Android-App (Start mit ?src=twa): keine Ko-fi-Links sichtbar (Google-Play-Zahlungsrichtlinie)
 async function twaCheck() {
   const browser = await chromium.launch();

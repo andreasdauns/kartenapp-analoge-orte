@@ -1,6 +1,7 @@
 import { CATEGORIES, CATEGORY_BY_ID, PROVIDERS, CARDS, fuelInfo, fuelCardsPassing } from './categories.js';
 import { parseHours, nextPoint, openState, weekSummary } from './hours.js';
 import * as R from './reports.js';
+import { ROUND_TASKS, ROUND_MODES, MAX_TASKS, planRound, googleRoundUrl } from './round.js';
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
 const LIST_LIMIT = 25;
@@ -104,6 +105,12 @@ const state = {
   atm: new Set(store.get('atm', []).filter((id) => ATM_IDS.has(id))), // Geldautomaten-Verbünde, leer = alle
   ev: new Set(store.get('ev', []).filter((id) => EV_IDS.has(id))), // Ladesäulen-Filter, leer = alle
   wc: new Set(store.get('wc', []).filter((id) => WC_IDS.has(id))), // Toiletten-Filter, leer = alle
+  round: { // Erledigungs-Runde (nur auf dem Gerät)
+    tasks: new Set(store.get('roundTasks', []).filter((id) => ROUND_TASKS.some((t) => t.id === id)).slice(0, MAX_TASKS)),
+    mode: ROUND_MODES[store.get('roundMode', '')] ? store.get('roundMode', '') : 'walking',
+    back: store.get('roundBack', true) !== false,
+    plan: null, markers: [],
+  },
   cont: new Set(store.get('cont', []).filter((id) => ['glas', 'papier', 'altkleider', 'wertstoffhof'].includes(id))),
   park: new Set(store.get('park', []).map((id) => (id === 'mitfahrer' ? 'parkride' : id)).filter((id) => ['rastplatz', 'parkride', 'wanderpark'].includes(id))),
 };
@@ -466,6 +473,7 @@ function renderChips() {
     <button class="chip" data-id="${c.id}" aria-pressed="${c.members ? groupOn(c) : state.active.has(c.id)}" style="--c:${c.color};--k:${c.ink}">
       <span class="ic">${c.icon}</span>${esc(c.plural)}
     </button>`).join('') + '<button class="chip wishchip" data-wish="1">Fehlt was?</button>';
+  $('#chips').insertAdjacentHTML('afterbegin', `<button class="chip roundchip" data-round="1" aria-pressed="${!!state.round.plan}"><span class="ic">${ICON_ROUTE}</span>Erledigungs-Runde</button>`);
 }
 function renderProviders() {
   for (const g of GROUPS) {
@@ -650,6 +658,11 @@ async function setupLayers() {
     },
     paint: { 'icon-opacity': ['case', ['==', ['get', 'u'], 1], 0.5, 1] },
   });
+  if (!map.getSource('round')) {
+    map.addSource('round', { type: 'geojson', data: fc([]) });
+    map.addLayer({ id: 'round-line', type: 'line', source: 'round', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#173B2C', 'line-width': 3, 'line-opacity': 0.75, 'line-dasharray': [2, 1.5] } }, 'pois');
+  }
+  if (state.round.plan) drawRound();
   applyFilter();
 }
 map.on('load', setupLayers);
@@ -1286,6 +1299,136 @@ $('#wish-cats').innerHTML = wishBtns(WISH_CATS);
 $('#wish-fb').innerHTML = wishBtns(WISH_FB);
 $('#wish-mail').href = 'mailto:' + ['andreas.dauns.apps', 'gmail.com'].join('@') + '?subject=' + encodeURIComponent('Nahfuchs-Idee');
 let wishSent = false;
+// ---------- Erledigungs-Runde ----------
+// Ein Ort kommt für eine Erledigung in Frage, wenn er zu den gewählten Filtern passt, nicht als verschwunden
+// gemeldet ist und – falls Öffnungs-/Einwurfzeiten bekannt sind – gerade geöffnet hat.
+function roundOk(it, task) {
+  if (task.id === 'paket' && !(allProviders() || (it.pv || []).some((p) => state.providers.has(p)))) return false;
+  if (it.c === FUEL && !cardsOk(it)) return false;
+  if (!evOk(it) || !atmOk(it) || !wcOk(it)) return false;
+  const r = state.rep?.get(it.id);
+  if (r && r.gone && r.gone.size >= 2) return false;
+  const oh = it.t?.opening_hours;
+  if (oh && it.c !== 'briefkasten') {
+    const st = openState(parseHours(oh));
+    if (st && st.open === false) return false;
+  }
+  return true;
+}
+function renderRoundForm() {
+  const rd = state.round, full = rd.tasks.size >= MAX_TASKS;
+  $('#round-tasks').innerHTML = ROUND_TASKS.map((t) => `<button class="wchip" data-task="${t.id}" aria-pressed="${rd.tasks.has(t.id)}"${full && !rd.tasks.has(t.id) ? ' disabled' : ''}>${esc(t.label)}</button>`).join('');
+  $('#round-modes').innerHTML = Object.entries(ROUND_MODES).map(([id, m]) => `<button class="wchip" data-mode="${id}" aria-pressed="${rd.mode === id}">${esc(m.label)}</button>`).join('')
+;
+  $('#round-back').innerHTML = `<button class="wchip" data-back="1" aria-pressed="${rd.back}">${rd.back ? '✓ ' : ''}Zurück zum Start einplanen</button>`;
+  $('#round-hint').textContent = full ? `Höchstens ${MAX_TASKS} Erledigungen auf einmal.` : `Bis zu ${MAX_TASKS} Erledigungen wählen.`;
+  $('#round-plan').disabled = !rd.tasks.size;
+}
+function openRound() {
+  renderRoundForm();
+  if (state.round.plan) showRoundResult(state.round.plan); // laufende Runde zuerst zeigen
+  else { $('#round-res').innerHTML = ''; $('#round-res').hidden = true; $('#round-form').hidden = false; }
+  $('#round').hidden = false;
+}
+async function waitForMe(ms = 7000) {
+  if (state.me) return true;
+  startLocate();
+  const t0 = Date.now();
+  while (!state.me && Date.now() - t0 < ms) await new Promise((r) => setTimeout(r, 200));
+  return !!state.me;
+}
+async function planAndShow() {
+  const rd = state.round;
+  $('#round-plan').disabled = true;
+  $('#round-plan').textContent = 'Suche die kürzeste Runde …';
+  const located = await waitForMe();
+  const start = located ? { lat: state.me.lat, lon: state.me.lon } : refPoint();
+  await loadTiles(keysAround(start.lat, start.lon, 1));
+  const plan = planRound({ items: state.items, start, taskIds: [...rd.tasks], mode: rd.mode, back: rd.back, ok: roundOk });
+  plan.start = start; plan.located = located; plan.mode = rd.mode;
+  $('#round-plan').textContent = 'Runde planen';
+  renderRoundForm();
+  showRoundResult(plan);
+}
+const roundSummary = (p) => `${p.stops.length} ${p.stops.length === 1 ? 'Stopp' : 'Stopps'} · ${fmtDist(p.totalM)} · ca. ${p.minutes} Min. ${ROUND_MODES[p.mode].label.toLowerCase()}${state.round.back ? ' mit Rückweg' : ''}`;
+function showRoundResult(p) {
+  const res = $('#round-res');
+  const m = ROUND_MODES[p.mode];
+  const miss = p.missing.length ? `<p class="round-miss">Nicht gefunden (im Umkreis von ${fmtDist(m.radius)}${p.missing.some((t) => t.id !== 'brief') ? ', gerade geöffnet' : ''}): ${p.missing.map((t) => esc(t.label)).join(', ')}</p>` : '';
+  if (!p.stops.length) {
+    $('#round-form').hidden = false;
+    res.innerHTML = `<p class="round-sum">Keine passende Runde gefunden.</p>${miss}<p class="round-note">Tipp: Wähle „Rad“ oder „Auto“ für einen größeren Umkreis.</p>`;
+    res.hidden = false;
+    state.round.plan = null;
+    return;
+  }
+  state.round.plan = p;
+  $('#round-form').hidden = true;
+  const multi = !state.nav || state.nav === 'google';
+  res.innerHTML = `
+    <p class="round-sum">${esc(roundSummary(p))}</p>
+    ${p.located ? '' : '<p class="round-miss">Standort nicht verfügbar – geplant ab der Kartenmitte.</p>'}
+    <ol class="round-list">${p.stops.map((s, i) => `<li data-ri="${i}"><span class="round-n">${i + 1}</span><span class="round-t"><b>${esc(s.task.label)}</b><small>${esc(titleOf(s.item))} · ${fmtDist(s.legM)}</small></span><a class="go" href="${routeUrl(s.item)}" target="_blank" rel="noopener" aria-label="Route zu Stopp ${i + 1}">${ICON_ROUTE}</a></li>`).join('')}</ol>
+    ${miss}
+    <a class="btn primary" id="round-go" href="${googleRoundUrl(p.stops, p.mode)}" target="_blank" rel="noopener">${ICON_ROUTE}Ganze Runde in Google Maps</a>
+    ${multi ? '' : '<p class="round-note">Apple Karten und Waze können keine Zwischenstopps. Tippe sonst die Stopps einzeln an.</p>'}
+    <button class="btn" id="round-map">Auf der Karte zeigen</button>
+    <button class="btn" id="round-edit">Erledigungen ändern</button>
+    <p class="round-note">Entfernung geschätzt (Luftlinie). Angaben und Öffnungszeiten laut Kartendaten, ohne Gewähr. Deine Runde wird nur auf deinem Gerät berechnet.</p>`;
+  res.hidden = false;
+  renderChips();
+}
+function drawRound() {
+  const p = state.round.plan;
+  state.round.markers.forEach((mk) => mk.remove());
+  state.round.markers = [];
+  if (!p) { map.getSource('round')?.setData(fc([])); $('#roundbar').hidden = true; return; }
+  const pts = [p.start, ...p.stops.map((s) => s.item), ...(state.round.back ? [p.start] : [])];
+  map.getSource('round')?.setData(fc([{ type: 'Feature', properties: {}, geometry: { type: 'LineString', coordinates: pts.map((x) => [x.lon, x.lat]) } }]));
+  p.stops.forEach((s, i) => {
+    const el = document.createElement('div');
+    el.className = 'round-mk';
+    el.textContent = String(i + 1);
+    el.addEventListener('click', (e) => { e.stopPropagation(); openDetail(s.item, true); });
+    state.round.markers.push(new maplibregl.Marker({ element: el }).setLngLat([s.item.lon, s.item.lat]).addTo(map));
+  });
+  $('#roundbar').innerHTML = `<button class="chip pv" id="rb-x" aria-label="Runde beenden">✕</button><span class="rb-t">${p.stops.length} ${p.stops.length === 1 ? 'Stopp' : 'Stopps'} · ${fmtDist(p.totalM)} · ${p.minutes} Min.</span><button class="chip pv" id="rb-list">Liste</button><a class="chip pv" id="rb-go" href="${googleRoundUrl(p.stops, p.mode)}" target="_blank" rel="noopener">Starten</a>`;
+  $('#roundbar').hidden = false;
+  layoutSheet();
+}
+function showRoundOnMap() {
+  const p = state.round.plan;
+  if (!p) return;
+  $('#round').hidden = true;
+  drawRound();
+  const b = new maplibregl.LngLatBounds();
+  [p.start, ...p.stops.map((s) => s.item)].forEach((x) => b.extend([x.lon, x.lat]));
+  map.fitBounds(b, { padding: { top: 140, bottom: Math.round(innerHeight * 0.35), left: 40, right: 40 }, maxZoom: 16, duration: 600 });
+}
+function clearRound() {
+  state.round.plan = null;
+  drawRound();
+  renderChips();
+}
+document.addEventListener('click', (e) => { if (e.target.closest('[data-round]')) openRound(); });
+$('#round').addEventListener('click', (e) => {
+  const rd = state.round;
+  const t = e.target.closest('[data-task]'), mo = e.target.closest('[data-mode]'), bk = e.target.closest('[data-back]');
+  if (t && !t.disabled) { if (rd.tasks.has(t.dataset.task)) rd.tasks.delete(t.dataset.task); else if (rd.tasks.size < MAX_TASKS) rd.tasks.add(t.dataset.task); store.set('roundTasks', [...rd.tasks]); renderRoundForm(); }
+  else if (mo) { rd.mode = mo.dataset.mode; store.set('roundMode', rd.mode); renderRoundForm(); }
+  else if (bk) { rd.back = !rd.back; store.set('roundBack', rd.back); renderRoundForm(); }
+  else if (e.target.closest('#round-map')) showRoundOnMap();
+  else if (e.target.closest('#round-edit')) { $('#round-res').hidden = true; $('#round-form').hidden = false; renderRoundForm(); }
+  else if (e.target.closest('.round-list li') && !e.target.closest('.go')) { const s = rd.plan?.stops[+e.target.closest('li').dataset.ri]; showRoundOnMap(); if (s) openDetail(s.item, true); }
+  else if (e.target === $('#round')) $('#round').hidden = true;
+});
+$('#round-plan').addEventListener('click', planAndShow);
+$('#round-close').addEventListener('click', () => { $('#round').hidden = true; });
+$('#roundbar').addEventListener('click', (e) => {
+  if (e.target.closest('#rb-x')) clearRound();
+  else if (e.target.closest('#rb-list')) { renderRoundForm(); showRoundResult(state.round.plan); $('#round').hidden = false; }
+});
+
 function openWish() {
   $('#wish').querySelectorAll('.wchip').forEach((b) => b.setAttribute('aria-pressed', 'false'));
   $('#wish-send').disabled = true;
