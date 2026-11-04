@@ -57,7 +57,7 @@ export const CATEGORIES = [
     icon: svg('<path d="M12 2.5l8.5 4.5v10L12 21.5 3.5 17V7z"/><path d="M3.5 7L12 11.5 20.5 7M12 11.5v10"/>'),
   },
   {
-    id: 'geldautomat', label: 'ATM', plural: 'ATMs',
+    id: 'geldautomat', label: 'Geldautomat', plural: 'Geldautomaten',
     color: '#8A4B12', ink: '#FFFFFF',
     icon: txt('€', 15),
   },

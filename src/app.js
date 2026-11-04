@@ -112,7 +112,7 @@ function titleOf(it) {
       return b || t.name || 'Paketstation';
     }
     case 'paketshop': return it.pk === 'filiale' ? 'Postfiliale' : 'Paketshop';
-    case 'geldautomat': return 'ATM';
+    case 'geldautomat': return 'Geldautomat';
     case 'ladesaeule': return 'Ladesäule';
     case 'apotheke': return t.name || 'Apotheke';
     case 'briefkasten': return 'Briefkasten';
