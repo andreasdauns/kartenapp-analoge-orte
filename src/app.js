@@ -25,6 +25,46 @@ const ICON_ROUTE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" s
 const ICON_FLAG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 21V4M5 4h11l-2 4 2 4H5"/></svg>';
 const ICON_X = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>';
 
+// ---------- Ladesäulen-Filter (Daten: Ladesäulenregister der Bundesnetzagentur) ----------
+const EV_FILTERS = [
+  { id: 'kw50', label: 'ab 50 kW', grp: 'kw' }, { id: 'kw150', label: 'ab 150 kW', grp: 'kw' },
+  { id: 'ccs', label: 'CCS', grp: 'plug' }, { id: 'typ2', label: 'Typ 2', grp: 'plug' }, { id: 'chademo', label: 'CHAdeMO', grp: 'plug' },
+  { id: 'karte', label: 'Mit Karte zahlen', grp: 'pay' }, { id: 'gratis', label: 'Kostenlos', grp: 'pay' },
+  { id: 'enbw', label: 'EnBW', grp: 'op', re: /\benbw\b/i }, { id: 'tesla', label: 'Tesla', grp: 'op', re: /tesla/i },
+  { id: 'ionity', label: 'Ionity', grp: 'op', re: /ionity/i }, { id: 'aral', label: 'Aral pulse', grp: 'op', re: /\baral\b/i },
+  { id: 'shell', label: 'Shell Recharge', grp: 'op', re: /shell|ubitricity/i }, { id: 'eon', label: 'E.ON', grp: 'op', re: /\be\.?\s?on\b/i },
+  { id: 'ewe', label: 'EWE Go', grp: 'op', re: /\bewe\b/i }, { id: 'allego', label: 'Allego', grp: 'op', re: /allego/i },
+  { id: 'fastned', label: 'Fastned', grp: 'op', re: /fastned/i },
+  { id: 'handel', label: 'Supermarkt & Handel', grp: 'op', re: /\b(aldi|lidl|kaufland|rewe|edeka|netto|penny|ikea|hornbach|obi|toom|globus)\b/i },
+];
+const EV_IDS = new Set(EV_FILTERS.map((f) => f.id));
+// Welche Filter erfüllt eine Ladesäule? (einmal berechnet)
+function evTags(it) {
+  if (it._ev) return it._ev;
+  const t = it.t, out = [];
+  const kw = Math.max(0, ...Object.keys(t).filter((k) => /^socket:.+:output$/.test(k)).map((k) => parseFloat(t[k]) || 0));
+  if (kw >= 50) out.push('kw50');
+  if (kw >= 150) out.push('kw150');
+  const has = (ty) => t[`socket:${ty}`] && t[`socket:${ty}`] !== 'no';
+  if (has('type2_combo')) out.push('ccs');
+  if (has('type2') || has('type2_cable')) out.push('typ2');
+  if (has('chademo')) out.push('chademo');
+  const pay = String(t.payment || '');
+  if (/debitkarte|kreditkarte|girocard|ec-karte/i.test(pay)) out.push('karte');
+  if (/kostenlos/i.test(pay) || t.fee === 'no') out.push('gratis');
+  const op = `${t.operator || ''} ${t.brand || ''} ${t.network || ''}`;
+  for (const f of EV_FILTERS) if (f.re && f.re.test(op)) out.push(f.id);
+  return (it._ev = out);
+}
+// Innerhalb einer Gruppe reicht ein Treffer (oder), zwischen den Gruppen müssen alle passen (und). Leistung: höchste Stufe zählt.
+function evGroups() {
+  const g = {};
+  for (const id of state.ev) { const f = EV_FILTERS.find((x) => x.id === id); (g[f.grp] ||= []).push(id); }
+  if (g.kw?.includes('kw150')) g.kw = ['kw150'];
+  return Object.values(g);
+}
+const evOk = (it) => it.c !== 'ladesaeule' || !state.ev.size || evGroups().every((ids) => ids.some((id) => evTags(it).includes(id)));
+
 const state = {
   index: null,
   items: [],
@@ -39,6 +79,7 @@ const state = {
   nav: store.get('navApp', null), // google | apple | waze
   providers: new Set(store.get('prov', []).filter((id) => PROVIDERS.some((p) => p.id === id))), // leer = alle Anbieter
   cards: new Set(store.get('cards', []).filter((id) => CARDS.some((c) => c.id === id))), // leer = alle Tankstellen
+  ev: new Set(store.get('ev', []).filter((id) => EV_IDS.has(id))), // Ladesäulen-Filter, leer = alle
   cont: new Set(store.get('cont', []).filter((id) => ['glas', 'papier', 'altkleider', 'wertstoffhof'].includes(id))), // leer = alle Container
 };
 const PROV = Object.fromEntries(PROVIDERS.map((p) => [p.id, p]));
@@ -50,7 +91,7 @@ const fuelOf = (it) => it._fi || (it._fi = fuelInfo(it.t));
 // Mit gewählten Karten: jede gewählte Karte muss „bestätigt“ oder „laut Marke üblich“ sein
 const cardsOk = (it) => state.cards.size === 0 || [...state.cards].every((c) => ['ok', 'likely'].includes(fuelOf(it).cards[c]?.lv));
 const passes = (it) => state.active.has(it.c) && (!PARCEL.includes(it.c) || allProviders() || (it.pv || []).some((p) => state.providers.has(p)))
-  && (it.c !== FUEL || cardsOk(it));
+  && (it.c !== FUEL || cardsOk(it)) && evOk(it);
 
 // ---------- Hilfsfunktionen ----------
 function distM(a, b) {
@@ -371,8 +412,21 @@ function renderProviders() {
   const fuel = CATEGORY_BY_ID[FUEL];
   $('#cards').hidden = !state.active.has(FUEL);
   $('#cards').innerHTML = CARDS.map((c) => `<button class="chip pv cd" data-card="${c.id}" aria-pressed="${state.cards.has(c.id)}" style="--c:${fuel.color};--k:${fuel.ink}">${esc(c.label)}</button>`).join('');
+  const ev = CATEGORY_BY_ID.ladesaeule;
+  $('#evrow').hidden = !state.active.has('ladesaeule');
+  $('#evrow').innerHTML = EV_FILTERS.map((f, i) => `${i && EV_FILTERS[i - 1].grp !== f.grp ? '<span class="chip-sep" aria-hidden="true"></span>' : ''}<button class="chip pv cd" data-ev="${f.id}" aria-pressed="${state.ev.has(f.id)}" style="--c:${ev.color};--k:${ev.ink}">${esc(f.label)}</button>`).join('');
   layoutSheet();
 }
+$('#evrow').addEventListener('click', (e) => {
+  const b = e.target.closest('.chip[data-ev]');
+  if (!b) return;
+  const id = b.dataset.ev;
+  if (state.ev.has(id)) state.ev.delete(id); else state.ev.add(id); // Mehrfachauswahl, leer = alle
+  store.set('ev', [...state.ev]);
+  renderProviders();
+  applyFilter();
+  if (state.selected && !state.selected.adding && !evOk(state.selected)) closeDetail(); else if (!state.selected) renderList();
+});
 $('#cards').addEventListener('click', (e) => {
   const b = e.target.closest('.chip');
   if (!b) return;
@@ -460,6 +514,7 @@ const pointF = (lon, lat, props = {}) => ({ type: 'Feature', properties: props, 
 const geojson = () => fc(state.items.map((it, i) => pointF(it.lon, it.lat, {
   c: it.c, i, pv: it.pv ? `|${it.pv.join('|')}|` : '',
   fc: it.c === FUEL ? `|${fuelCardsPassing(fuelOf(it)).join('|')}|` : '',
+  ev: it.c === 'ladesaeule' ? `|${evTags(it).join('|')}|` : '',
   u: it.src === 'user' && !isConfirmed(it) ? 1 : 0,
 })));
 
@@ -468,6 +523,7 @@ function applyFilter() {
   const conds = [['in', ['get', 'c'], ['literal', [...state.active]]]];
   if (!allProviders()) conds.push(['any', ['!', ['in', ['get', 'c'], ['literal', PARCEL]]], ...[...state.providers].map((p) => ['in', `|${p}|`, ['get', 'pv']])]);
   if (state.cards.size) conds.push(['any', ['!=', ['get', 'c'], FUEL], ['all', ...[...state.cards].map((c) => ['in', `|${c}|`, ['get', 'fc']])]]);
+  if (state.ev.size) conds.push(['any', ['!=', ['get', 'c'], 'ladesaeule'], ['all', ...evGroups().map((ids) => ['any', ...ids.map((id) => ['in', `|${id}|`, ['get', 'ev']])])]]);
   map.setFilter('pois', conds.length === 1 ? conds[0] : ['all', ...conds]);
 }
 

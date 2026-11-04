@@ -107,6 +107,18 @@ async function run(kind, mobile) {
         if (sub.join(',') !== 'Glas,Papier,Altkleider,Wertstoffhöfe') bad(ctx, `Container-Unterzeile falsch: ${sub.join(', ')}`);
       }
       await page.waitForTimeout(1800);
+      if (chip.id === 'ladesaeule') {
+        if (await page.locator('#evrow').isHidden()) bad(ctx, 'Ladesäulen-Filterzeile erscheint nicht');
+        else {
+          await page.locator('#evrow .chip[data-ev="kw150"]').click();
+          await page.waitForTimeout(1500);
+          const subs = await page.$$eval('#sheet-body .row .sub', (a) => a.slice(0, 6).map((x) => x.textContent));
+          const low = subs.filter((t) => { const m = /(\d+(?:[.,]\d+)?) kW/.exec(t); return !m || parseFloat(m[1].replace(',', '.')) < 150; });
+          if (low.length) bad(ctx, `Filter „ab 150 kW“ zeigt langsamere Säulen: ${low.slice(0, 2).join(' | ')}`);
+          await page.locator('#evrow .chip[data-ev="kw150"]').click();
+          await page.waitForTimeout(800);
+        }
+      }
       const rows = await page.locator('#sheet-body .row').count();
       // In großen Städten muss es diese Kategorien immer geben; Rastplätze/Wertstoffhöfe liegen oft außerhalb
       const expected = STRICT && !['rastplatz', 'wertstoffhof'].includes(chip.id);
