@@ -32,8 +32,18 @@ function repPoint(g) {
   }
 }
 
+// Mehrfachwerte wie „GLS;UPS;FedEx;UPS“ bereinigen (nicht bei Zeitangaben, dort sind Wiederholungen gewollt)
+const dedupVal = (k, v) => {
+  if (typeof v !== 'string' || !v.includes(';') || /hours|times|date|conditional/.test(k)) return v;
+  const seen = new Set();
+  return v.split(';').map((x) => x.trim()).filter((x) => x && !seen.has(x.toLowerCase()) && seen.add(x.toLowerCase())).join(';');
+};
 const items = [];
 const places = [];
+// osmium exportiert geschlossene Wege oft doppelt (als Linie und als Fläche) → gleiche ID nur einmal je Kategorie,
+// bevorzugt die Fläche (Mittelpunkt statt Randpunkt).
+const byKey = new Map();
+const geomRank = (g) => (g?.type === 'LineString' ? 1 : 2);
 const rl = readline.createInterface({ input: createReadStream(input), crlfDelay: Infinity });
 for await (let line of rl) {
   line = line.replace(/^\x1e/, '').trim();
@@ -53,13 +63,21 @@ for await (let line of rl) {
   const cats = classify(tags);
   if (!cats.length) continue;
   const t = {};
-  for (const [k, v] of Object.entries(tags)) if (KEEP_TAG(k, cats)) t[k] = v;
+  for (const [k, v] of Object.entries(tags)) if (KEEP_TAG(k, cats)) t[k] = dedupVal(k, v);
+  const rank = geomRank(f.geometry);
   for (const c of cats) {
     const it = { id: `${type[0]}${id}`, c, lat, lon, t };
     if (c === 'packstation' || c === 'paketshop') {
       const p = parcelInfo(tags);
       it.pk = p.kind; it.pv = p.pv; it.ps = p.send;
     }
+    const key = `${it.id}|${c}`;
+    const prev = byKey.get(key);
+    if (prev) {
+      if (rank > prev.rank) { prev.it.lat = lat; prev.it.lon = lon; prev.rank = rank; } // Fläche statt Linie
+      continue;
+    }
+    byKey.set(key, { it, rank });
     items.push(it);
   }
 }
