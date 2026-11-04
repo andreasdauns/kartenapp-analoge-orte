@@ -44,6 +44,14 @@ jobs:
         run: python3 -m pip install -q --break-system-packages duckdb==2.0.0 && python3 scripts/overture.py
       - name: Kacheln für die App bauen
         run: node --max-old-space-size=6144 scripts/build-data.mjs work/all.geojsonseq
+      - name: Daten prüfen (Doppelte, Lücken, Einbrüche gegenüber gestern)
+        run: node scripts/check-data.mjs --prev https://nahfuchs.de/data/index.json
+      - name: Test-Browser installieren
+        run: npm install --no-save --no-audit --no-fund playwright@1.49.1 && npx playwright install --with-deps chromium webkit firefox
+      - name: Klick-Test der App (Chrome, Safari-Technik, Firefox; Handy und PC)
+        env:
+          STRICT: '1'
+        run: node scripts/ui-check.mjs || (echo "Zweiter Versuch …" && node scripts/ui-check.mjs)
       - name: Arbeitsdateien entfernen
         run: rm -rf work node_modules
       - uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
