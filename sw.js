@@ -1,5 +1,5 @@
 // Service Worker: App offline startfähig, Daten immer zuerst frisch aus dem Netz.
-const VERSION = 'v43';
+const VERSION = 'v44';
 const SHELL = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
   'src/app.js', 'src/categories.js', 'src/hours.js', 'src/reports.js', 'src/config.js',
@@ -23,6 +23,6 @@ self.addEventListener('fetch', (e) => {
         if (res.ok) caches.open(VERSION).then((c) => c.put(e.request, copy));
         return res;
       })
-      .catch(() => caches.match(e.request))
+      .catch(() => caches.match(e.request, { ignoreSearch: e.request.mode === 'navigate' })) // z. B. Start der Android-App mit ?src=twa
   );
 });

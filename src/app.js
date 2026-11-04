@@ -1092,7 +1092,9 @@ $('#welcome-share').addEventListener('click', shareApp);
 // Ohne Zähler und ohne Nutzungsprofil: Der Hinweis erscheint höchstens einmal pro App-Sitzung nach einer
 // erfolgreichen Meldung. Gespeichert wird nur, wenn jemand selbst „Nicht mehr anzeigen“ wählt.
 let supportShown = false;
+const IN_ANDROID_APP = document.documentElement.classList.contains('twa'); // Play-Store-App: keine externen Zahlungslinks
 function maybeShowSupport(force = false) {
+  if (IN_ANDROID_APP) return;
   if (!force && (supportShown || store.get('supportHidden', false))) return;
   supportShown = true;
   setTimeout(() => {

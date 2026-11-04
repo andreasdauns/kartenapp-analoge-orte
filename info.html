@@ -34,6 +34,8 @@
     button.btn { border: 0; font: inherit; font-weight: 650; cursor: pointer; }
     button.btn:disabled { opacity: .45; cursor: default; }
   </style>
+  <script>/* Android-App (Play Store): Unterstützungs-Links ausblenden (Google-Play-Zahlungsrichtlinie). Merkmal nur für diese Sitzung. */try{var q=new URLSearchParams(location.search);if(q.get('src')==='twa'||document.referrer.indexOf('android-app://')===0)sessionStorage.setItem('twa','1');if(sessionStorage.getItem('twa')==='1')document.documentElement.classList.add('twa')}catch(e){}</script>
+  <style>.twa .kofi-only{display:none!important}</style>
 </head>
 <body>
 <main>
@@ -58,7 +60,7 @@
     <p>Über „Fehlt was?“ (am Ende der Kategorie-Leiste und der Liste) kannst du dir neue Kategorien wünschen und uns sagen, was gut oder schlecht läuft – ebenfalls nur per Antippen. Alles andere gern per E-Mail.</p>
   </section>
 
-  <section id="unterstuetzen">
+  <section id="unterstuetzen" class="kofi-only">
     <h2>Unterstützen</h2>
     <p>Nahfuchs ist kostenlos, ohne Werbung und ohne Konto – und soll es bleiben. Domain, App-Store-Gebühren und Datenpflege kosten aber Geld. Wenn du magst, kannst du die App unterstützen, einmalig oder monatlich: <a href="https://ko-fi.com/nahfuchs" target="_blank" rel="noopener">ko-fi.com/nahfuchs ↗</a> (externe Seite). Genauso hilft es, die App weiterzuempfehlen. Danke!</p>
     <p class="small">Die Unterstützung ist freiwillig und ohne Gegenleistung. Nahfuchs ist kein gemeinnütziges Projekt; die Unterstützung ist daher nicht steuerlich absetzbar, und es gibt keine Zuwendungsbestätigung.</p>

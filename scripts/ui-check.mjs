@@ -136,6 +136,28 @@ async function run(kind, mobile) {
   await browser.close();
 }
 
+// Android-App (Start mit ?src=twa): keine Ko-fi-Links sichtbar (Google-Play-Zahlungsrichtlinie)
+async function twaCheck() {
+  const browser = await chromium.launch();
+  const context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await context.route(/openfreemap\.org/, (r) => r.fulfill({ contentType: 'application/json', body: BLANK_STYLE }));
+  await context.route(/supabase\.co/, (r) => r.fulfill({ contentType: 'application/json', body: '[]' }));
+  const page = await context.newPage();
+  await page.goto(BASE + '?src=twa&unterstuetzen=1');
+  await page.waitForTimeout(1500);
+  if (await page.locator('a[href*="ko-fi"]:visible').count()) bad('Android-App', 'Ko-fi-Link in der App sichtbar');
+  await page.goto(BASE + 'info.html#unterstuetzen');
+  await page.waitForTimeout(800);
+  if (await page.locator('a[href*="ko-fi"]:visible').count()) bad('Android-App', 'Ko-fi-Link auf der Info-Seite sichtbar');
+  // Gegenprobe Website: dort bleibt der Link
+  const web = await browser.newContext();
+  const p2 = await web.newPage();
+  await p2.goto(BASE + 'info.html#unterstuetzen');
+  if (!(await p2.locator('a[href*="ko-fi"]:visible').count())) bad('Website', 'Ko-fi-Link auf der Info-Seite fehlt');
+  await browser.close();
+}
+await twaCheck();
+
 for (const kind of BROWSERS) {
   await run(kind, true);
   if (kind === 'chromium') await run(kind, false);
