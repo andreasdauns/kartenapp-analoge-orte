@@ -48,7 +48,7 @@ async function run(kind, mobile) {
     const context = await browser.newContext({
       viewport: mobile ? { width: 390, height: 844 } : { width: 1280, height: 860 },
       ...(mobile && kind !== 'firefox' ? { isMobile: true, hasTouch: true } : {}),
-      geolocation: { latitude: place.lat, longitude: place.lon }, permissions: kind === 'firefox' || kind === 'webkit' ? [] : ['geolocation'],
+      geolocation: { latitude: place.lat, longitude: place.lon }, permissions: kind === 'webkit' ? [] : ['geolocation'],
       locale: 'de-DE',
     });
     if (kind !== 'chromium') await context.grantPermissions(['geolocation']).catch(() => {});
@@ -102,7 +102,10 @@ async function run(kind, mobile) {
       const rows = await page.locator('#sheet-body .row').count();
       // In großen Städten muss es diese Kategorien immer geben; Rastplätze/Wertstoffhöfe liegen oft außerhalb
       const expected = STRICT && !['rastplatz', 'wertstoffhof'].includes(chip.id);
-      if (!rows) (expected ? bad : (c, m) => notes.push(`[${c}] ${m}`))(ctx, `Keine Einträge für „${chip.text}“`);
+      if (!rows) {
+        const sheetTxt = (await page.locator('#sheet-body').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 90);
+        (expected ? bad : (c, m) => notes.push(`[${c}] ${m}`))(ctx, `Keine Einträge für „${chip.text}“ (Anzeige: ${sheetTxt})`);
+      }
       const listText = await page.locator('#sheet-body').innerText().catch(() => '');
       if (/undefined|null|NaN|\[object/.test(listText)) bad(ctx, `Liste „${chip.text}“ enthält undefined/null/NaN`);
       for (let i = 0; i < Math.min(rows, 3); i++) {
