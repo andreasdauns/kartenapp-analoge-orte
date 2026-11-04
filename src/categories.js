@@ -42,19 +42,9 @@ export const CATEGORIES = [
     icon: txt('P', 15),
   },
   {
-    id: 'parkplatz', label: 'Parkplatz', plural: 'Parkplätze',
-    color: '#1565C0', ink: '#FFFFFF',
-    icon: txt('P', 15),
-  },
-  {
     id: 'parkride', label: 'Park & Ride', plural: 'Park & Ride',
     color: '#00796B', ink: '#FFFFFF',
     icon: txt('P+R', 8),
-  },
-  {
-    id: 'mitfahrer', label: 'Mitfahrerparkplatz', plural: 'Mitfahrerparkplätze',
-    color: '#6A1B9A', ink: '#FFFFFF',
-    icon: svg('<circle cx="8" cy="7" r="2.5"/><circle cx="16" cy="7" r="2.5"/><path d="M3.5 19v-2.5A3.5 3.5 0 0 1 7 13h2a3.5 3.5 0 0 1 3.5 3.5M11.5 19v-2.5A3.5 3.5 0 0 1 15 13h2a3.5 3.5 0 0 1 3.5 3.5V19"/>'),
   },
   {
     id: 'wanderpark', label: 'Wanderparkplatz', plural: 'Wanderparkplätze',
@@ -118,10 +108,10 @@ export function classify(tags = {}) {
   const closedAccess = /^(private|no|customers|delivery|permit|residents|employees|destination|agricultural|forestry|military|discouraged)$/;
   const smallKind = /^(street_side|lane|on_kerb|half_on_kerb|carports|garage_boxes|garages|layby|sheds)$/;
   if ((a === 'parking' || a === 'car_pooling') && !closedAccess.test(tags.access || '') && !smallKind.test(tags.parking || '') && tags.highway !== 'rest_area' && tags.highway !== 'services') {
-    if (a === 'car_pooling' || tags.park_ride === 'hov' || tags.carpool === 'designated') out.push('mitfahrer');
-    else if (tags.park_ride && tags.park_ride !== 'no') out.push('parkride');
+    // Park & Ride schließt Mitfahrer-/Pendlerparkplätze ein
+    if (a === 'car_pooling' || tags.park_ride === 'hov' || tags.carpool === 'designated' || (tags.park_ride && tags.park_ride !== 'no')) out.push('parkride');
     else if (yes(tags.hiking) || /wanderpark/i.test(tags.name || '')) out.push('wanderpark');
-    else out.push('parkplatz');
+    // normale Parkplätze bewusst nicht (Entscheidung Andreas 4.11.: zu viele, unübersichtlich)
   }
   const locker = a === 'parcel_locker' || (a === 'vending_machine' && /parcel/.test(tags.vending || ''));
   if (locker) out.push('packstation');

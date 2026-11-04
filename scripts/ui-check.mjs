@@ -105,18 +105,13 @@ async function run(kind, mobile) {
         if (await page.locator('#containers').isHidden()) bad(ctx, 'Container-Unterzeile erscheint nicht');
         const sub = await page.$$eval('#containers .chip', (a) => a.map((b) => [...b.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim()));
         if (sub.join(',') !== 'Glas,Papier,Altkleider,Wertstoffhöfe') bad(ctx, `Container-Unterzeile falsch: ${sub.join(', ')}`);
+        await groupCheck(page, ctx, chip, 'containers');
       }
       if (chip.id === 'parken') {
         if (await page.locator('#parkrow').isHidden()) bad(ctx, 'Parken-Unterzeile erscheint nicht');
         const sub = await page.$$eval('#parkrow .chip', (a) => a.map((b) => [...b.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim()));
-        if (sub.join(',') !== 'Raststätten & Rastplätze,Parkplätze,Park & Ride,Mitfahrerparkplätze,Wanderparkplätze') bad(ctx, `Parken-Unterzeile falsch: ${sub.join(', ')}`);
-        // Unterauswahl „Parkplätze“: nur Parkplätze in der Liste
-        await page.locator('#parkrow .chip[data-ct="parkplatz"]').click();
-        await page.waitForTimeout(1500);
-        const icons = await page.$$eval('#sheet-body .row .name', (a) => a.length);
-        if (STRICT && !icons) bad(ctx, 'Unterauswahl „Parkplätze“ zeigt keine Einträge');
-        await page.locator('#parkrow .chip[data-ct="parkplatz"]').click();
-        await page.waitForTimeout(800);
+        if (sub.join(',') !== 'Raststätten & Rastplätze,Park & Ride,Wanderparkplätze') bad(ctx, `Parken-Unterzeile falsch: ${sub.join(', ')}`);
+        await groupCheck(page, ctx, chip, 'parkrow');
       }
       await page.waitForTimeout(1800);
       if (chip.id === 'geldautomat') {
@@ -176,11 +171,66 @@ async function run(kind, mobile) {
         await page.waitForTimeout(300);
       }
       await page.locator(`#chips .chip[data-id="${chip.id}"]`).click(); // wieder aus
-      await page.waitForTimeout(200);
+      await page.waitForTimeout(400);
+      // Ausgeschaltet heißt: nichts mehr davon auf der Karte und in der Liste
+      const left = await activeCats(page);
+      if (left.length) bad(ctx, `Nach dem Ausschalten von „${chip.text}“ noch sichtbar: ${left.join(', ')}`);
+      if (await page.locator('#sheet-body .row').count()) bad(ctx, `Nach dem Ausschalten von „${chip.text}“ stehen noch Orte in der Liste`);
+      if ((await page.locator(`#chips .chip[data-id="${chip.id}"]`).getAttribute('aria-pressed')) !== 'false') bad(ctx, `Knopf „${chip.text}“ bleibt nach dem Ausschalten gedrückt`);
     }
     await context.close();
   }
   await browser.close();
+}
+
+// Was gerade auf der Karte gefiltert ist (setzt die App bei jedem Filterwechsel)
+const activeCats = async (page) => (await page.evaluate(() => document.documentElement.dataset.cats || '')).split(',').filter(Boolean);
+
+// Unterzeile einer Gruppe (Abfall & Container, Parken): jeder Knopf blendet genau seine Orte ein und aus
+async function groupCheck(page, ctx, chip, row) {
+  const subs = await page.$$eval(`#${row} .chip[data-ct]`, (a) => a.map((b) => b.dataset.ct));
+  const sub = (id) => page.locator(`#${row} .chip[data-ct="${id}"]`);
+  const pressed = async (id) => (await sub(id).getAttribute('aria-pressed')) === 'true';
+  let act = await activeCats(page);
+  for (const id of subs) {
+    if (!(await pressed(id))) bad(ctx, `${chip.text}: „${id}“ ist nach dem Einschalten nicht gedrückt`);
+    if (!act.includes(id)) bad(ctx, `${chip.text}: „${id}“ ist nach dem Einschalten nicht sichtbar`);
+  }
+  for (const id of subs) {
+    await sub(id).click();
+    await page.waitForTimeout(700);
+    act = await activeCats(page);
+    if (act.includes(id)) bad(ctx, `${chip.text}: „${id}“ bleibt nach dem Abwählen sichtbar`);
+    const lost = subs.filter((x) => x !== id && !act.includes(x));
+    if (lost.length) bad(ctx, `${chip.text}: Abwählen von „${id}“ blendet auch ${lost.join(', ')} aus`);
+    if (await pressed(id)) bad(ctx, `${chip.text}: „${id}“ bleibt nach dem Abwählen gedrückt`);
+    if (await page.locator(`#sheet-body .row[data-c="${id}"]`).count()) bad(ctx, `${chip.text}: „${id}“ steht nach dem Abwählen noch in der Liste`);
+    await sub(id).click();
+    await page.waitForTimeout(700);
+    act = await activeCats(page);
+    if (!act.includes(id) || !(await pressed(id))) bad(ctx, `${chip.text}: „${id}“ lässt sich nicht wieder einblenden`);
+    const lost2 = subs.filter((x) => !act.includes(x));
+    if (lost2.length) bad(ctx, `${chip.text}: nach erneutem Anwählen von „${id}“ fehlen ${lost2.join(', ')}`);
+  }
+  // Nur eine Unterart: andere abwählen → nur diese in Liste und Karte
+  const only = subs[1] || subs[0];
+  for (const id of subs) if (id !== only) { await sub(id).click(); await page.waitForTimeout(300); }
+  await page.waitForTimeout(800);
+  act = await activeCats(page);
+  if (act.join(',') !== only) bad(ctx, `${chip.text}: nur „${only}“ gewählt, sichtbar sind aber ${act.join(', ') || 'keine'}`);
+  const wrong = await page.$$eval('#sheet-body .row', (a, o) => a.filter((r) => r.dataset.c !== o).length, only);
+  if (wrong) bad(ctx, `${chip.text}: nur „${only}“ gewählt, Liste zeigt ${wrong} andere Orte`);
+  // Letzte abwählen → Gruppe aus
+  await sub(only).click();
+  await page.waitForTimeout(600);
+  if (await page.locator(`#${row}`).isVisible()) bad(ctx, `${chip.text}: Unterzeile bleibt nach Abwählen aller Knöpfe offen`);
+  if ((await activeCats(page)).length) bad(ctx, `${chip.text}: nach Abwählen aller Knöpfe ist noch etwas sichtbar`);
+  // Gruppe wieder an → alle an
+  await page.locator(`#chips .chip[data-id="${chip.id}"]`).click();
+  await page.waitForTimeout(1200);
+  act = await activeCats(page);
+  const miss = subs.filter((x) => !act.includes(x));
+  if (miss.length) bad(ctx, `${chip.text}: nach erneutem Einschalten fehlen ${miss.join(', ')}`);
 }
 
 // Android-App (Start mit ?src=twa): keine Ko-fi-Links sichtbar (Google-Play-Zahlungsrichtlinie)

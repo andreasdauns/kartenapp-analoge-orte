@@ -94,7 +94,7 @@ const state = {
   atm: new Set(store.get('atm', []).filter((id) => ATM_IDS.has(id))), // Geldautomaten-Verbünde, leer = alle
   ev: new Set(store.get('ev', []).filter((id) => EV_IDS.has(id))), // Ladesäulen-Filter, leer = alle
   cont: new Set(store.get('cont', []).filter((id) => ['glas', 'papier', 'altkleider', 'wertstoffhof'].includes(id))),
-  park: new Set(store.get('park', []).filter((id) => ['rastplatz', 'parkplatz', 'parkride', 'mitfahrer', 'wanderpark'].includes(id))), // leer = alle Container
+  park: new Set(store.get('park', []).map((id) => (id === 'mitfahrer' ? 'parkride' : id)).filter((id) => ['rastplatz', 'parkride', 'wanderpark'].includes(id))),
 };
 const PROV = Object.fromEntries(PROVIDERS.map((p) => [p.id, p]));
 const PARCEL = ['packstation', 'paketshop'];
@@ -119,7 +119,8 @@ const noteUrl = (it) => `https://www.openstreetmap.org/note/new?lat=${it.lat}&lo
 const jaNein = (v) => ({ yes: 'ja', no: 'nein', limited: 'eingeschränkt', designated: 'ja', only: 'nur' }[v] || v);
 const fmtDate = (s) => { const m = /^(\d{4})-(\d{2})(?:-(\d{2}))?/.exec(s || ''); return m ? (m[3] ? `${m[3]}.${m[2]}.${m[1]}` : `${m[2]}/${m[1]}`) : s; };
 const isContainer = (c) => c === 'glas' || c === 'papier' || c === 'altkleider';
-const PARKING = ['parkplatz', 'parkride', 'mitfahrer', 'wanderpark'];
+const PARKING = ['parkride', 'wanderpark'];
+const isCarpool = (t) => t.amenity === 'car_pooling' || t.park_ride === 'hov' || t.carpool === 'designated';
 const PARK_KIND = { surface: 'ebenerdig', 'multi-storey': 'Parkhaus', underground: 'Tiefgarage', rooftop: 'Parkdeck' };
 // Gruppen-Knöpfe mit Unterzeile (wie Paketdienste): „Abfall & Container“ und „Parken“.
 // Welche Unterarten aktiv sind, ergibt sich aus der Unterauswahl (leer = alle).
@@ -127,21 +128,32 @@ const BIN_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fi
 const GROUPS = [
   { id: 'container', plural: 'Abfall & Container', color: '#2F8F4E', ink: '#FFFFFF', icon: BIN_ICON, row: 'containers', key: 'cont',
     members: ['glas', 'papier', 'altkleider', 'wertstoffhof'], labels: { glas: 'Glas', papier: 'Papier', altkleider: 'Altkleider', wertstoffhof: 'Wertstoffhöfe' } },
-  { id: 'parken', plural: 'Parken', color: '#1E3A8A', ink: '#FFFFFF', icon: CATEGORY_BY_ID.parkplatz.icon, row: 'parkrow', key: 'park',
-    members: ['rastplatz', 'parkplatz', 'parkride', 'mitfahrer', 'wanderpark'],
-    labels: { rastplatz: 'Raststätten & Rastplätze', parkplatz: 'Parkplätze', parkride: 'Park & Ride', mitfahrer: 'Mitfahrerparkplätze', wanderpark: 'Wanderparkplätze' } },
+  { id: 'parken', plural: 'Parken', color: '#1E3A8A', ink: '#FFFFFF', icon: CATEGORY_BY_ID.rastplatz.icon, row: 'parkrow', key: 'park',
+    members: ['rastplatz', 'parkride', 'wanderpark'],
+    labels: { rastplatz: 'Raststätten & Rastplätze', parkride: 'Park & Ride', wanderpark: 'Wanderparkplätze' } },
 ];
 const GROUP_OF = Object.fromEntries(GROUPS.flatMap((g) => g.members.map((m) => [m, g])));
 const groupSel = (g) => state[g.key];
 const groupOn = (g) => g.members.some((c) => state.active.has(c));
+// Die Unterauswahl ist immer genau das, was sichtbar ist: gedrückt = auf der Karte, nicht gedrückt = ausgeblendet.
 function syncGroup(g, on = groupOn(g)) {
   g.members.forEach((c) => state.active.delete(c));
-  if (on) g.members.filter((c) => !groupSel(g).size || groupSel(g).has(c)).forEach((c) => state.active.add(c));
+  if (on) {
+    if (!groupSel(g).size) g.members.forEach((c) => groupSel(g).add(c)); // beim Einschalten: alle (oder die letzte Auswahl)
+    g.members.filter((c) => groupSel(g).has(c)).forEach((c) => state.active.add(c));
+  }
   store.set('cats', [...state.active]);
   store.set(g.key, [...groupSel(g)]);
 }
-// Alte Auswahl (einzelne Chips von früher) in die Unterauswahl übernehmen
-for (const g of GROUPS) if (groupOn(g) && !g.members.every((c) => state.active.has(c)) && !groupSel(g).size) g.members.filter((c) => state.active.has(c)).forEach((c) => groupSel(g).add(c));
+// Gespeicherten Stand angleichen (auch alte Kategorie „mitfahrer“ → Park & Ride)
+if (state.active.delete('mitfahrer')) state.active.add('parkride');
+for (const g of GROUPS) {
+  if (!groupOn(g)) continue;
+  groupSel(g).clear();
+  g.members.filter((c) => state.active.has(c)).forEach((c) => groupSel(g).add(c));
+  store.set(g.key, [...groupSel(g)]);
+  store.set('cats', [...state.active]);
+}
 
 const NAV = {
   google: { name: 'Google Maps', url: (it) => `https://www.google.com/maps/dir/?api=1&destination=${it.lat},${it.lon}&travelmode=driving` },
@@ -179,8 +191,8 @@ function titleOf(it) {
     case 'briefkasten': return 'Briefkasten';
     case 'toilette': return t.name && !/^(wc|toilette)$/i.test(t.name) ? t.name : 'Öffentliche Toilette';
     case 'rastplatz': return t.name || (t.highway === 'services' ? 'Raststätte' : 'Rastplatz');
-    case 'parkplatz': case 'parkride': case 'mitfahrer': case 'wanderpark':
-      return t.name || { 'multi-storey': 'Parkhaus', underground: 'Tiefgarage', rooftop: 'Parkdeck' }[t.parking] || CATEGORY_BY_ID[it.c].label;
+    case 'parkride': case 'wanderpark':
+      return t.name || { 'multi-storey': 'Parkhaus', underground: 'Tiefgarage', rooftop: 'Parkdeck' }[t.parking] || (it.c === 'parkride' && isCarpool(t) ? 'Mitfahrerparkplatz' : CATEGORY_BY_ID[it.c].label);
     case 'tankstelle': return fuelOf(it).brand?.label || t.brand || t.name || t.operator || 'Tankstelle';
     case 'wertstoffhof': {
       if (t.name && !/^(wertstoffhof|recyclinghof)$/i.test(t.name)) return t.name;
@@ -333,7 +345,8 @@ function factsRaw(it) {
   if (PARKING.includes(it.c)) {
     const cnt = (v) => (v && !/^(no|0)$/.test(v) ? (v === 'yes' ? 'vorhanden' : v) : null);
     add('Art', PARK_KIND[t.parking]);
-    add('Park & Ride', it.c === 'parkride' ? ({ train: 'mit Anschluss an die Bahn', bus: 'mit Anschluss an den Bus', tram: 'mit Anschluss an die Straßenbahn', metro: 'mit Anschluss an die U-Bahn', ferry: 'mit Anschluss an die Fähre' }[t.park_ride] || 'ja') : null);
+    add('Art des Angebots', it.c === 'parkride' && isCarpool(t) ? 'Mitfahrerparkplatz (Pendlerparkplatz)' : null);
+    add('Park & Ride', it.c === 'parkride' && !isCarpool(t) ? ({ train: 'mit Anschluss an die Bahn', bus: 'mit Anschluss an den Bus', tram: 'mit Anschluss an die Straßenbahn', metro: 'mit Anschluss an die U-Bahn', ferry: 'mit Anschluss an die Fähre' }[t.park_ride] || 'ja') : null);
     add('Gebühr', t.fee === 'no' ? 'kostenlos' : t.fee === 'yes' ? (t.charge || 'kostenpflichtig') : null);
     add('Stellplätze', t.capacity);
     add('Behindertenparkplätze', cnt(t['capacity:disabled']));
@@ -506,8 +519,10 @@ for (const g of GROUPS) $('#' + g.row).addEventListener('click', (e) => {
   const b = e.target.closest('.chip[data-ct]');
   if (!b) return;
   const id = b.dataset.ct;
-  if (groupSel(g).has(id)) groupSel(g).delete(id); else groupSel(g).add(id); // Mehrfachauswahl, leer = alle
-  syncGroup(g, true);
+  if (groupSel(g).has(id)) groupSel(g).delete(id); else groupSel(g).add(id); // einzeln ein-/ausblenden
+  syncGroup(g, groupSel(g).size > 0); // alles abgewählt = Gruppe aus
+  zoomHint();
+  renderChips();
   renderProviders();
   applyFilter();
   if (state.selected && !state.active.has(state.selected.c)) closeDetail();
@@ -583,6 +598,7 @@ function applyFilter() {
   if (state.atm.size) conds.push(['any', ['!=', ['get', 'c'], 'geldautomat'], ['in', ['get', 'an'], ['literal', [...state.atm]]]]);
   if (state.ev.size) conds.push(['any', ['!=', ['get', 'c'], 'ladesaeule'], ['all', ...evGroups().map((ids) => ['any', ...ids.map((id) => ['in', `|${id}|`, ['get', 'ev']])])]]);
   map.setFilter('pois', conds.length === 1 ? conds[0] : ['all', ...conds]);
+  document.documentElement.dataset.cats = [...state.active].sort().join(','); // für den Klick-Test
 }
 
 async function setupLayers() {
@@ -851,7 +867,7 @@ function rowHtml(it, ref) {
   const cat = CATEGORY_BY_ID[it.c];
   const st = reportChips(it)[0] || statusOf(it);
   const sub = subOf(it);
-  return `<div class="row" data-i="${it._i}" role="button" tabindex="0">
+  return `<div class="row" data-i="${it._i}" data-c="${it.c}" role="button" tabindex="0">
     <span class="ic" style="--c:${cat.color};--k:${cat.ink}">${cat.icon}</span>
     <span class="main">
       <div class="name">${esc(titleOf(it))}${it.c === FUEL ? appBadge(it) : ''}</div>
@@ -1158,10 +1174,9 @@ function openAdd() {
     state.selected = null;
     await submit({ place_id: id, category: cat, kind: 'new', lat: +c.lat.toFixed(6), lon: +c.lng.toFixed(6) }, 'Danke! Der Ort ist eingetragen und wartet auf Bestätigung.');
     const g = GROUP_OF[cat];
-    if (g && groupSel(g).size) groupSel(g).add(cat);
     state.active.add(cat);
+    if (g) { groupSel(g).add(cat); store.set(g.key, [...groupSel(g)]); }
     store.set('cats', [...state.active]);
-    if (g) store.set(g.key, [...groupSel(g)]);
     renderChips(); renderProviders(); applyFilter();
   });
   layoutSheet();
