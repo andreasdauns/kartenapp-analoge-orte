@@ -40,7 +40,8 @@ const NAME_KEYS = ['Betreiber', 'Marke', 'Bank', 'Geschäft', 'Anbieter'];
 
 async function run(kind, mobile) {
   const engine = { chromium, webkit, firefox }[kind];
-  const browser = await engine.launch();
+  // Firefox hat ohne Grafikkarte (Testserver) WebGL standardmäßig aus → für den Test per Software erzwingen
+  const browser = await engine.launch(kind === 'firefox' ? { firefoxUserPrefs: { 'webgl.force-enabled': true, 'webgl.disabled': false, 'webgl.enable-webgl2': true, 'layers.acceleration.force-enabled': true } } : {});
   const label = `${kind}${mobile ? ' Handy' : ' PC'}`;
   for (const place of PLACES) {
     const ctx = `${label} · ${place.name}`;
@@ -55,7 +56,8 @@ async function run(kind, mobile) {
     await context.route(/openfreemap\.org/, (r) => (r.request().url().includes('/styles/') ? r.fulfill({ contentType: 'application/json', body: BLANK_STYLE }) : r.abort()));
     await context.route(/supabase\.co/, (r) => r.fulfill({ contentType: 'application/json', body: '[]' }));
     const page = await context.newPage();
-    page.on('pageerror', (e) => bad(ctx, `JavaScript-Fehler: ${e.message}`));
+    let noGL = false;
+    page.on('pageerror', (e) => { if (/initialize WebGL|webglcontextcreationerror/.test(e.message)) noGL = true; else bad(ctx, `JavaScript-Fehler: ${e.message}`); });
     await page.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('welcomed', '1'); localStorage.setItem('supportHidden', '1'); } catch { /* */ } });
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
 
@@ -65,6 +67,7 @@ async function run(kind, mobile) {
       if (s === true) { bad(ctx, 'Quellenbox beim Start aufgeklappt'); break; }
       await page.waitForTimeout(150);
     }
+    if (noGL) { notes.push(`[${ctx}] WebGL auf dem Testserver nicht verfügbar – übersprungen (Umgebung, kein App-Fehler)`); await context.close(); continue; }
     if (!(await page.locator('.mini-attrib').isVisible().catch(() => false))) bad(ctx, 'Kurzangabe „© OpenStreetMap · Impressum“ fehlt');
 
     // Hinweis-Karte darf sich auf dem Handy nicht hochziehen lassen
