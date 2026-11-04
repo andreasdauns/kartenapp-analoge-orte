@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="primary">#1F4D3A</color>
+    <color name="navbar">#FFFFFF</color>
+    <color name="splash_bg">#EEF3EC</color>
+    <color name="ic_bg">#1F4D3A</color>
+</resources>

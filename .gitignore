@@ -1,3 +1,9 @@
 node_modules/
 work/
 data/
+# Android-Build und Schlüssel nie einchecken
+android/.gradle/
+android/build/
+android/app/build/
+*.jks
+*.keystore

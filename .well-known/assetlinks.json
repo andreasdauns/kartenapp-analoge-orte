@@ -1,0 +1,10 @@
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "de.nahfuchs.app",
+    "sha256_cert_fingerprints": [
+      "A7:EA:5E:55:8F:37:CD:51:76:35:05:45:D8:19:51:72:C0:38:5D:FC:29:A9:68:A7:D2:D9:F1:CF:E7:C1:7A:75"
+    ]
+  }
+}]
