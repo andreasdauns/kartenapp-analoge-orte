@@ -39,7 +39,7 @@ const state = {
   nav: store.get('navApp', null), // google | apple | waze
   providers: new Set(store.get('prov', []).filter((id) => PROVIDERS.some((p) => p.id === id))), // leer = alle Anbieter
   cards: new Set(store.get('cards', []).filter((id) => CARDS.some((c) => c.id === id))), // leer = alle Tankstellen
-  cont: new Set(store.get('cont', []).filter((id) => ['glas', 'papier', 'altkleider'].includes(id))), // leer = alle Container
+  cont: new Set(store.get('cont', []).filter((id) => ['glas', 'papier', 'altkleider', 'wertstoffhof'].includes(id))), // leer = alle Container
 };
 const PROV = Object.fromEntries(PROVIDERS.map((p) => [p.id, p]));
 const PARCEL = ['packstation', 'paketshop'];
@@ -64,11 +64,11 @@ const noteUrl = (it) => `https://www.openstreetmap.org/note/new?lat=${it.lat}&lo
 const jaNein = (v) => ({ yes: 'ja', no: 'nein', limited: 'eingeschränkt', designated: 'ja', only: 'nur' }[v] || v);
 const fmtDate = (s) => { const m = /^(\d{4})-(\d{2})(?:-(\d{2}))?/.exec(s || ''); return m ? (m[3] ? `${m[3]}.${m[2]}.${m[1]}` : `${m[2]}/${m[1]}`) : s; };
 const isContainer = (c) => c === 'glas' || c === 'papier' || c === 'altkleider';
-// Glas, Papier und Altkleider erscheinen oben als eine Kategorie „Container“ mit Unterauswahl (wie Paketdienste)
-const CONTAINERS = ['glas', 'papier', 'altkleider'];
-const CONT_LABEL = { glas: 'Glas', papier: 'Papier', altkleider: 'Altkleider' };
+// Glas, Papier, Altkleider und Wertstoffhöfe erscheinen oben als eine Kategorie „Abfall & Container“ mit Unterauswahl (wie Paketdienste)
+const CONTAINERS = ['glas', 'papier', 'altkleider', 'wertstoffhof']; // Gruppe „Abfall & Container“
+const CONT_LABEL = { glas: 'Glas', papier: 'Papier', altkleider: 'Altkleider', wertstoffhof: 'Wertstoffhöfe' };
 const CONT_GROUP = {
-  id: 'container', plural: 'Container', color: '#2F8F4E', ink: '#FFFFFF',
+  id: 'container', plural: 'Abfall & Container', color: '#2F8F4E', ink: '#FFFFFF',
   icon: '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16l-1.5 12.5h-13z"/><path d="M3 8h18M9 4.5h6v3.5M10 12v5M14 12v5"/></svg>',
 };
 const containersOn = () => CONTAINERS.some((c) => state.active.has(c));
@@ -786,7 +786,7 @@ function renderList() {
     return;
   }
   if (!state.active.size) {
-    body.innerHTML = '<div class="sheet-h"><h2>Was suchst du?</h2></div><div class="empty">Tippe oben auf eine oder mehrere Kategorien, z. B. Briefkästen oder Container.</div>';
+    body.innerHTML = '<div class="sheet-h"><h2>Was suchst du?</h2></div><div class="empty">Tippe oben auf eine oder mehrere Kategorien, z. B. Briefkästen oder Abfall & Container.</div>';
     layoutSheet();
     return;
   }

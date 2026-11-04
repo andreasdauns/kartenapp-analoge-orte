@@ -104,7 +104,7 @@ async function run(kind, mobile) {
       if (chip.id === 'container') {
         if (await page.locator('#containers').isHidden()) bad(ctx, 'Container-Unterzeile erscheint nicht');
         const sub = await page.$$eval('#containers .chip', (a) => a.map((b) => b.textContent.trim()));
-        if (sub.join(',') !== 'Glas,Papier,Altkleider') bad(ctx, `Container-Unterzeile falsch: ${sub.join(', ')}`);
+        if (sub.join(',') !== 'Glas,Papier,Altkleider,Wertstoffhöfe') bad(ctx, `Container-Unterzeile falsch: ${sub.join(', ')}`);
       }
       await page.waitForTimeout(1800);
       const rows = await page.locator('#sheet-body .row').count();
