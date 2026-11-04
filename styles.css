@@ -256,3 +256,7 @@ body.dragging .fabs, body.dragging .maplibregl-ctrl-bottom-left { transition: no
 .chip.pv.ct .ic { width: 24px; height: 24px; }
 .chip.pv.ct .ic svg { width: 15px; height: 15px; }
 .chips { -webkit-user-select: none; user-select: none; }
+
+/* „Melden“ beim Eintragen immer sichtbar (klebt unten im Blatt); Dialoge scrollen bei großer Schrift statt abgeschnitten zu werden */
+.detail .add-row { position: sticky; bottom: 0; z-index: 1; background: var(--card); padding: 8px 0 6px; margin: 6px 0 0; }
+.chooser-card { max-height: calc(100dvh - 32px - var(--safe-bottom, 0px)); overflow-y: auto; }

@@ -169,6 +169,37 @@ async function twaCheck() {
 }
 await twaCheck();
 
+// „Neuen Ort melden“ auf kleinem Handy mit großer Systemschrift: der Melden-Knopf muss sichtbar und antippbar sein
+async function addCheck() {
+  const browser = await chromium.launch();
+  for (const zoom of [1, 1.35]) {
+    const context = await browser.newContext({ viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true, geolocation: { latitude: 50.5446, longitude: 7.1136 }, permissions: ['geolocation'] });
+    await context.route(/openfreemap\.org/, (r) => r.fulfill({ contentType: 'application/json', body: BLANK_STYLE }));
+    await context.route(/supabase\.co/, (r) => r.fulfill({ contentType: 'application/json', body: '[]' }));
+    await context.addInitScript((z) => { try { localStorage.setItem('welcomed', '1'); } catch { /* */ } document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.zoom = String(z); }); }, zoom);
+    const page = await context.newPage();
+    await page.goto(BASE);
+    await page.waitForTimeout(2000);
+    const ctx = `Neuer Ort · Schriftgröße ${Math.round(zoom * 100)} %`;
+    if (!(await page.locator('#btn-add').isVisible())) { notes.push(`[${ctx}] Plus-Knopf nicht aktiv (Datenbank im Test aus)`); await context.close(); continue; }
+    await page.locator('#btn-add').click();
+    await page.waitForTimeout(800);
+    await page.locator('[data-cat]').nth(1).click();
+    await page.waitForTimeout(500);
+    const ok = await page.evaluate(() => {
+      const b = document.getElementById('add-save'); if (!b) return 'fehlt';
+      const r = b.getBoundingClientRect();
+      if (r.bottom > innerHeight || r.top < 0 || r.height === 0) return `außerhalb des Bildschirms (oben ${Math.round(r.top)}, unten ${Math.round(r.bottom)}, Höhe ${innerHeight})`;
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return hit === b || b.contains(hit) ? 'ok' : 'verdeckt';
+    });
+    if (ok !== 'ok') bad(ctx, `„Melden“-Knopf ${ok}`);
+    await context.close();
+  }
+  await browser.close();
+}
+await addCheck();
+
 for (const kind of BROWSERS) {
   await run(kind, true);
   if (kind === 'chromium') await run(kind, false);

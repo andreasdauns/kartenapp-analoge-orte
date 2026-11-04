@@ -640,7 +640,7 @@ function peekHeight() {
   if (state.selected) {
     const c = body.firstElementChild;
     const safe = parseFloat(getComputedStyle(body).paddingBottom) || 12;
-    const max = state.selected.adding ? Math.round(innerHeight * 0.42) : sheetMax(); // beim Eintragen max. knapp halber Bildschirm
+    const max = state.selected.adding ? Math.round(innerHeight * 0.55) : sheetMax(); // beim Eintragen höchstens gut die Hälfte (Kreuz bleibt sichtbar)
     return Math.min(max, Math.round($('#grip').offsetHeight + (c ? c.getBoundingClientRect().height : 120) + safe + 4));
   }
   const rows = body.querySelectorAll('.row');
@@ -662,6 +662,9 @@ function layoutSheet() {
   sheet.classList.toggle('peek', !full && !state.selected);
   document.documentElement.style.setProperty('--sheet-max', `${sheetMax()}px`);
   setVisible(h);
+  // Inhalt nur so hoch wie der sichtbare Teil – sonst liegen Knöpfe (z. B. „Melden“) unsichtbar unter dem Bildschirmrand,
+  // etwa bei großer Systemschrift (Samsung) oder kleinen Handys. Darüber hinaus wird im Blatt gescrollt.
+  body.style.maxHeight = wide() ? '' : `${Math.max(60, h - $('#grip').offsetHeight)}px`;
   const pad = { top: Math.round($('.top').offsetHeight + 8), bottom: Math.round(wide() ? 0 : Math.min(h, innerHeight * 0.5)), left: wide() ? 420 : 0, right: 0 };
   const cur = map.getPadding();
   if (cur.top !== pad.top || cur.bottom !== pad.bottom || cur.left !== pad.left) {
