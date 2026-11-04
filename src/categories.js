@@ -62,7 +62,7 @@ export const CATEGORIES = [
     icon: txt('€', 15),
   },
   {
-    id: 'apotheke', label: 'Apotheke', plural: 'Apotheken-Notdienst',
+    id: 'apotheke', label: 'Apotheke', plural: 'Apotheken',
     color: '#C62828', ink: '#FFFFFF',
     icon: svg('<path d="M9.5 3.5h5v6h6v5h-6v6h-5v-6h-6v-5h6z"/>'),
   },

@@ -794,7 +794,7 @@ function renderList() {
   const loadingHere = keysAround(ref.lat, ref.lon, 0).some((k) => state.loading.has(k));
   const empty = loadingHere ? 'Orte werden geladen …' : (tileKey(ref.lat, ref.lon) in state.index.tiles ? 'In der Nähe ist nichts eingetragen.' : 'Dieses Gebiet ist noch nicht in der App (bisher: ' + state.index.regions.join(', ') + ').');
   body.innerHTML = `
-    <div class="sheet-h"><h2>Nächste ${esc(only === 'Apotheken-Notdienst' ? 'Apotheken' : only)}</h2><span class="from">${ref.mine ? '' : 'ab Kartenmitte'}</span></div>
+    <div class="sheet-h"><h2>Nächste ${esc(only)}</h2><span class="from">${ref.mine ? '' : 'ab Kartenmitte'}</span></div>
     ${notdienstHint()}
     ${list.length ? list.map((x) => rowHtml(x.it, ref)).join('') : `<div class="empty">${esc(empty)}</div>`}
     ${list.length > PEEK_ROWS && state.mode === 'peek' ? '<div class="hint">Nach oben ziehen für mehr</div>' : ''}
