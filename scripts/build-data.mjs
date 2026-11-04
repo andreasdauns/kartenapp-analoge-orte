@@ -173,6 +173,11 @@ if (!process.env.NO_EXTERNAL) {
   }
 }
 
+// Fehlerhafte Koordinaten aus Zusatzquellen (z. B. Ladesäulen mitten in der Nordsee) aussortieren
+for (let i = kept.length - 1; i >= 0; i--) {
+  const it = kept[i];
+  if (it.lat < 47.2 || it.lat > 55.1 || it.lon < 5.8 || it.lon > 15.1) { console.log(`Aussortiert (außerhalb DE): ${it.c} ${it.id} ${it.lat},${it.lon}`); kept.splice(i, 1); }
+}
 const key = (la, lo) => `${Math.floor(la / TILE)}_${Math.floor(lo / TILE)}`;
 const tiles = new Map();
 const tileOf = (k) => { if (!tiles.has(k)) tiles.set(k, { items: [], places: [] }); return tiles.get(k); };

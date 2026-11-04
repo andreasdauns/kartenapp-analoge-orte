@@ -43,9 +43,8 @@ for (const f of files) {
     // 3) Wiederholte Mehrfachwerte („A;B;A“)
     for (const [key, v] of Object.entries(it.t)) {
       if (typeof v !== 'string' || TIME_KEY.test(key) || !v.includes(';')) continue;
-      const parts = v.split(';').map(norm).filter(Boolean);
-      if (new Set(parts).size < parts.length && ex.innerDup.length < 10) ex.innerDup.push(`${where} ${key}=${v}`);
-      if (new Set(parts).size < parts.length) err(`Wert doppelt: ${where} ${key}=${v}`);
+      const parts = v.split(';').map((x) => x.trim().toLowerCase()).filter(Boolean);
+      if (new Set(parts).size < parts.length) { if (ex.innerDup.length < 10) ex.innerDup.push(`${where} ${key}=${v}`); err(`Wert doppelt: ${where} ${key}=${v}`); }
     }
     // 4) Gleicher Ort zweimal (gleiche Kategorie + gleicher Name/Betreiber, < 40 m) – nur Hinweis
     if (MULTI_OK.has(it.c)) continue;
@@ -67,12 +66,14 @@ let prev = null;
 if (prevUrl) {
   try { prev = await (await fetch(prevUrl)).json(); } catch { warn('Vorversion nicht abrufbar – Vergleich übersprungen'); }
 }
+// Gewollter Rückgang (z. B. nach Entfernen von Doppelten): Commit-Nachricht enthält „[Rückgang ok]“ → nur Hinweis
+const dropMsg = process.env.ALLOW_DROP === 'true' ? warn : err;
 if (prev?.counts) {
   const ptotal = Object.values(prev.counts).reduce((a, b) => a + b, 0);
-  if (total < ptotal * 0.9) err(`Orte gesamt: ${ptotal} → ${total} (minus ${Math.round((1 - total / ptotal) * 100)} %)`);
+  if (total < ptotal * 0.9) dropMsg(`Orte gesamt: ${ptotal} → ${total} (minus ${Math.round((1 - total / ptotal) * 100)} %)`);
   for (const [c, n] of Object.entries(prev.counts)) {
     const now = counts[c] || 0;
-    if (n >= 200 && now < n * 0.7) err(`${c}: ${n} → ${now} (minus ${Math.round((1 - now / n) * 100)} %)`);
+    if (n >= 200 && now < n * 0.7) dropMsg(`${c}: ${n} → ${now} (minus ${Math.round((1 - now / n) * 100)} %)`);
   }
 }
 

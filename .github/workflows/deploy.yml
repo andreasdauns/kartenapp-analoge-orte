@@ -45,6 +45,8 @@ jobs:
       - name: Kacheln für die App bauen
         run: node --max-old-space-size=6144 scripts/build-data.mjs work/all.geojsonseq
       - name: Daten prüfen (Doppelte, Lücken, Einbrüche gegenüber gestern)
+        env:
+          ALLOW_DROP: ${{ contains(github.event.head_commit.message, '[Rückgang ok]') }}
         run: node scripts/check-data.mjs --prev https://nahfuchs.de/data/index.json
       - name: Test-Browser installieren
         run: npm install --no-save --no-audit --no-fund playwright@1.49.1 && npx playwright install --with-deps chromium webkit firefox
