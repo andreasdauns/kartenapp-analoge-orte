@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write # nur um die fertige App-Datei im Zweig android-release abzulegen
 
 jobs:
   aab:
@@ -46,3 +46,14 @@ jobs:
           name: nahfuchs-android-${{ github.run_number }}
           path: android/app/build/outputs/bundle/release/*.aab
           retention-days: 30
+      - name: Fertige App-Datei im Zweig android-release ablegen (zum Hochladen in die Play Console)
+        if: env.KEYSTORE_FILE != ''
+        run: |
+          mkdir -p "$RUNNER_TEMP/rel" && cp android/app/build/outputs/bundle/release/*.aab "$RUNNER_TEMP/rel/nahfuchs.aab"
+          cd "$RUNNER_TEMP/rel"
+          echo "Version ${{ github.run_number }} – gebaut aus ${{ github.sha }}" > VERSION.txt
+          git init -q && git checkout -q -b android-release
+          git config user.name "github-actions[bot]"
+          git config user.email "41898283+github-actions[bot]@users.noreply.github.com"
+          git add . && git commit -qm "Android-App Version ${{ github.run_number }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" android-release
