@@ -38,6 +38,8 @@
     <nav class="chips prov" id="evrow" aria-label="Ladesäulen-Filter" hidden></nav>
     <nav class="chips prov" id="wcrow" aria-label="Toiletten-Filter" hidden></nav>
     <nav class="chips prov roundbar" id="roundbar" aria-label="Erledigungs-Runde" hidden></nav>
+    <nav class="chips prov roundbar" id="wohinbar" aria-label="Wohin damit" hidden></nav>
+    <nav class="chips prov roundbar" id="gapbar" aria-label="Hier fehlt was" hidden></nav>
   </header>
 
   <div class="crosshair" id="crosshair" hidden aria-hidden="true"></div>
@@ -121,6 +123,7 @@
       <div class="wish-sec">Sonst noch was?</div>
       <div class="wish-chips" id="wish-fb"></div>
       <button class="btn primary" id="wish-send" disabled>Abschicken</button>
+      <button class="link" id="wish-gap">Fehlt an einer bestimmten Stelle etwas? Auf der Karte zeigen</button>
       <a class="link wish-mail" id="wish-mail" href="#">Etwas anderes? Schreib uns eine E-Mail ↗</a>
       <button class="link" id="wish-close">Schließen</button>
     </div>
@@ -140,6 +143,17 @@
       </div>
       <div id="round-res" hidden></div>
       <button class="link" id="round-close">Schließen</button>
+    </div>
+  </div>
+
+  <div class="chooser" id="gap" hidden>
+    <div class="chooser-card wish-card" role="dialog" aria-modal="true" aria-labelledby="gap-h">
+      <h2 id="gap-h">Was fehlt hier? 🦊</h2>
+      <p>Tippe an, was du hier vermisst. Das ist ein Wunsch – kein Eintrag auf der Karte. Gibt es den Ort schon, trag ihn mit dem + Knopf ein.</p>
+      <div class="wish-chips" id="gap-items"></div>
+      <p class="gap-privacy">Gespeichert wird nur das Raster (ca. 500 × 500 m), die Art und das Datum – nicht der genaue Punkt, nicht dein Standort, keine Kennung.</p>
+      <button class="btn primary" id="gap-send" disabled>Wunsch senden</button>
+      <button class="link" id="gap-close">Abbrechen</button>
     </div>
   </div>
 

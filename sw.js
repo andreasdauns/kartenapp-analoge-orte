@@ -1,8 +1,8 @@
 // Service Worker: App offline startfähig, Daten immer zuerst frisch aus dem Netz.
-const VERSION = 'v55';
+const VERSION = 'v57';
 const SHELL = [
   './', 'index.html', 'styles.css', 'manifest.webmanifest',
-  'src/app.js', 'src/categories.js', 'src/hours.js', 'src/reports.js', 'src/config.js', 'src/round.js',
+  'src/app.js', 'src/categories.js', 'src/hours.js', 'src/reports.js', 'src/config.js', 'src/round.js', 'src/wohin.js',
   'vendor/maplibre-gl.js', 'vendor/maplibre-gl.css', 'icons/icon.svg',
 ];
 

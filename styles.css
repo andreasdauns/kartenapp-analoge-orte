@@ -284,3 +284,30 @@ body.dragging .fabs, body.dragging .maplibregl-ctrl-bottom-left { transition: no
 .chip.roundchip .ic { background: var(--chip-on); color: var(--chip-on-ink); }
 .chip.roundchip[aria-pressed="true"] .ic { background: var(--chip-on-ink); color: var(--chip-on); }
 #rb-go { text-decoration: none; }
+
+/* Wohin damit? */
+.ov-tabs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px; padding: 4px; background: var(--bg); border-radius: 14px; margin: 6px 0 8px; }
+.ov-tabs button { height: 42px; border: 0; border-radius: 11px; background: transparent; font: inherit; font-weight: 700; font-size: 15px; color: var(--muted); }
+.ov-tabs button[aria-selected="true"] { background: var(--accent); color: #fff; }
+.wohin-intro { margin: 4px 0 2px; font-weight: 700; font-size: 16px; }
+.wohin-note { font-size: 12.5px; color: var(--muted); margin: 8px 0 4px; }
+.wchip.rule-only { border-style: dashed; }
+.wohin-rule { background: var(--ok-bg); border-radius: 14px; padding: 12px; margin: 4px 0 8px; display: flex; flex-direction: column; gap: 6px; }
+.wohin-rule b { color: var(--ok); font-size: 15px; }
+.wohin-rule p { margin: 0; font-size: 14px; line-height: 1.4; }
+.wohin-rule .wohin-src { font-size: 12px; color: var(--muted); }
+.wohin-rule .wohin-src a { color: inherit; }
+.wohin-rule .wohin-link { flex: none; height: 44px; white-space: normal; text-align: center; }
+.sheet-h button.link { border: 0; background: none; color: var(--accent); font: inherit; font-weight: 700; font-size: 15px; padding: 6px 2px; margin-left: auto; }
+
+/* Mini-Aufgaben */
+.mini-q { border: 2px solid var(--fox); background: color-mix(in srgb, var(--fox) 7%, var(--card)); border-radius: 16px; padding: 12px; margin: 10px 0 4px; display: flex; flex-direction: column; gap: 8px; }
+.mini-q .mini-h { display: flex; gap: 6px; align-items: baseline; font-size: 12.5px; color: var(--muted); }
+.mini-q .mini-h b { color: #8A3F0F; text-transform: uppercase; letter-spacing: .05em; font-size: 12px; }
+.mini-q p { margin: 0; font-weight: 700; font-size: 16px; }
+.mini-q .mini-a { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.mini-q .mini-a .btn { flex: none; height: 46px; white-space: normal; }
+.mini-q small { color: var(--muted); font-size: 12px; }
+@media (prefers-color-scheme: dark) { .mini-q .mini-h b { color: var(--fox); } }
+.gap-privacy { font-size: 12.5px; color: var(--muted); background: var(--bg); border-radius: 12px; padding: 8px 10px; margin: 2px 0; }
+.btn.gap-here { width: 100%; margin: 6px 0; flex: none; white-space: normal; height: auto; min-height: 46px; padding: 8px 12px; }

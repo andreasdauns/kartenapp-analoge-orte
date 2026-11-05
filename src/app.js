@@ -2,6 +2,7 @@ import { CATEGORIES, CATEGORY_BY_ID, PROVIDERS, CARDS, fuelInfo, fuelCardsPassin
 import { parseHours, nextPoint, openState, weekSummary } from './hours.js';
 import * as R from './reports.js';
 import { ROUND_TASKS, ROUND_MODES, MAX_TASKS, planRound, googleRoundUrl } from './round.js';
+import { WOHIN, WOHIN_BY_ID, WOHIN_NOTE, FLAG_LABEL, SAMMEL_FLAGS, recycleFlags, wohinMatches, wohinCats } from './wohin.js';
 
 const STYLE_URL = 'https://tiles.openfreemap.org/styles/positron';
 const LIST_LIMIT = 25;
@@ -17,6 +18,10 @@ const $ = (s) => document.querySelector(s);
 const safeUrl = (u) => { try { const x = new URL(u); return x.protocol === 'https:' ? esc(x.href) : '#'; } catch { return '#'; } };
 const CONTACT_MAIL = ['andreas.dauns.apps', 'gmail.com'].join('@');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+// „Hier fehlt was“, Mini-Aufgaben und Meldungen zu Sammelstellen brauchen die Datenbank-Erweiterung
+// supabase/2026-11-05-mitmachen.sql – erst danach einschalten.
+const MITMACHEN = false;
+document.documentElement.dataset.mitmachen = MITMACHEN ? '1' : '0';
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
   set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* egal */ } },
@@ -111,7 +116,8 @@ const state = {
     back: store.get('roundBack', true) !== false,
     plan: null, markers: [],
   },
-  cont: new Set(store.get('cont', []).filter((id) => ['glas', 'papier', 'altkleider', 'wertstoffhof'].includes(id))),
+  cont: new Set(store.get('cont', []).filter((id) => ['glas', 'papier', 'altkleider', 'sammelstelle', 'wertstoffhof'].includes(id))),
+  wohin: null, wohinPick: false, wohinPrev: null, // „Wohin damit?“: gewählter Gegenstand, Auswahl offen, vorherige Kategorien
   park: new Set(store.get('park', []).map((id) => (id === 'mitfahrer' ? 'parkride' : id)).filter((id) => ['rastplatz', 'parkride', 'wanderpark'].includes(id))),
 };
 const PROV = Object.fromEntries(PROVIDERS.map((p) => [p.id, p]));
@@ -123,7 +129,7 @@ const fuelOf = (it) => it._fi || (it._fi = fuelInfo(it.t));
 // Mit gewählten Karten: jede gewählte Karte muss „bestätigt“ oder „laut Marke üblich“ sein
 const cardsOk = (it) => state.cards.size === 0 || [...state.cards].every((c) => ['ok', 'likely'].includes(fuelOf(it).cards[c]?.lv));
 const passes = (it) => state.active.has(it.c) && (!PARCEL.includes(it.c) || allProviders() || (it.pv || []).some((p) => state.providers.has(p)))
-  && (it.c !== FUEL || cardsOk(it)) && evOk(it) && atmOk(it) && wcOk(it);
+  && (it.c !== FUEL || cardsOk(it)) && evOk(it) && atmOk(it) && wcOk(it) && wohinMatches(state.wohin && WOHIN_BY_ID[state.wohin], it);
 
 // ---------- Hilfsfunktionen ----------
 function distM(a, b) {
@@ -145,7 +151,7 @@ const PARK_KIND = { surface: 'ebenerdig', 'multi-storey': 'Parkhaus', undergroun
 const BIN_ICON = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h16l-1.5 12.5h-13z"/><path d="M3 8h18M9 4.5h6v3.5M10 12v5M14 12v5"/></svg>';
 const GROUPS = [
   { id: 'container', plural: 'Abfall & Container', color: '#2F8F4E', ink: '#FFFFFF', icon: BIN_ICON, row: 'containers', key: 'cont',
-    members: ['glas', 'papier', 'altkleider', 'wertstoffhof'], labels: { glas: 'Glas', papier: 'Papier', altkleider: 'Altkleider', wertstoffhof: 'Wertstoffhöfe' } },
+    members: ['glas', 'papier', 'altkleider', 'sammelstelle', 'wertstoffhof'], labels: { glas: 'Glas', papier: 'Papier', altkleider: 'Altkleider', sammelstelle: 'Sammelstellen', wertstoffhof: 'Wertstoffhöfe' } },
   { id: 'parken', plural: 'Parken', color: '#1E3A8A', ink: '#FFFFFF', icon: CATEGORY_BY_ID.rastplatz.icon, row: 'parkrow', key: 'park',
     members: ['rastplatz', 'parkride', 'wanderpark'],
     labels: { rastplatz: 'Raststätten & Rastplätze', parkride: 'Park & Ride', wanderpark: 'Wanderparkplätze' } },
@@ -225,6 +231,12 @@ function titleOf(it) {
     case 'parkride': case 'wanderpark':
       return t.name || { 'multi-storey': 'Parkhaus', underground: 'Tiefgarage', rooftop: 'Parkdeck' }[t.parking] || (it.c === 'parkride' && isCarpool(t) ? 'Mitfahrerparkplatz' : CATEGORY_BY_ID[it.c].label);
     case 'tankstelle': return fuelOf(it).brand?.label || t.brand || t.name || t.operator || 'Tankstelle';
+    case 'sammelstelle': {
+      if (t.name) return t.name;
+      const f = recycleFlags(t).filter((x) => SAMMEL_FLAGS.includes(x));
+      if (f.length && f.every((x) => /green_waste|garden_waste/.test(x))) return 'Grünschnitt-Sammelplatz';
+      return t.shop ? 'Sammelbox im Geschäft' : 'Sammelstelle';
+    }
     case 'wertstoffhof': {
       if (t.name && !/^(wertstoffhof|recyclinghof)$/i.test(t.name)) return t.name;
       const green = t['recycling:green_waste'] === 'yes' || t['recycling:garden_waste'] === 'yes';
@@ -244,6 +256,7 @@ function subOf(it) {
     parts.push((it.pv || []).map((p) => PROV[p]?.label).filter(Boolean).join(', '));
   }
   if (it.c === 'wertstoffhof') parts.push(t.operator);
+  if (it.c === 'sammelstelle') parts.push([...new Set(recycleFlags(t).map((x) => FLAG_LABEL[x]).filter(Boolean))].slice(0, 4).join(', '));
   if (it.c === FUEL) {
     const title = titleOf(it).toLowerCase();
     parts.push([t.operator, t.brand, t.name].find((v) => v && !v.toLowerCase().includes(title) && !title.includes(v.toLowerCase())));
@@ -334,6 +347,12 @@ function factsRaw(it) {
     add('Leerung', weekSummary(parseHours(t.collection_times, 'points')) || t.collection_times || 'unbekannt');
     add('Zuletzt geprüft', fmtDate(t['check_date:collection_times'] || t.check_date || t['survey:date']));
     add('Kasten-Nr.', t.ref);
+  }
+  if (it.c === 'sammelstelle') {
+    add('Nimmt an (laut Kartendaten)', [...new Set(recycleFlags(t).map((x) => FLAG_LABEL[x] || MATERIAL[x]).filter(Boolean))].join(', '));
+    add('Art', t.shop ? 'Sammelbox in einem Geschäft' : t.amenity === 'recycling' ? 'Container / Sammelstelle' : null);
+    add('Öffnungszeiten', weekSummary(parseHours(t.opening_hours)) || t.opening_hours);
+    add('Betreiber', t.operator);
   }
   if (isContainer(it.c)) {
     const mats = Object.keys(t).filter((k) => /^recycling:[a-z_]+$/.test(k) && t[k] === 'yes').map((k) => MATERIAL[k.slice(10)] || k.slice(10));
@@ -472,7 +491,13 @@ function extraChips(it) {
     const checked = t['check_date:collection_times'] || t.check_date || t['survey:date'];
     if (!checked || checked < POST_CHANGE) out.push({ cls: 'warn', text: 'Zeit evtl. veraltet' });
   }
+  const F = repOf(it)?.facts || {};
+  const said = (yes, no) => (F[yes]?.size || 0) >= R.CONFIRM_NEEDED && (F[yes]?.size || 0) > (F[no]?.size || 0);
   if (it.c === 'toilette') {
+    if (!t.fee && said('fee_no', 'fee_yes')) out.push({ cls: 'ok', text: 'kostenlos (laut Nutzern)' });
+    if (!t.fee && said('fee_yes', 'fee_no')) out.push({ cls: '', text: 'kostenpflichtig (laut Nutzern)' });
+    if (!t.wheelchair && said('wc_yes', 'wc_no')) out.push({ cls: '', text: 'barrierefrei (laut Nutzern)' });
+    if (!t.changing_table && said('baby_yes', 'baby_no')) out.push({ cls: '', text: 'Wickeltisch (laut Nutzern)' });
     if (t.centralkey === 'eurokey') out.push({ cls: '', text: 'Euroschlüssel' });
     if (t.wheelchair === 'yes') out.push({ cls: '', text: 'barrierefrei (laut Karte)' });
   }
@@ -486,11 +511,14 @@ function renderChips() {
     <button class="chip" data-id="${c.id}" aria-pressed="${c.members ? groupOn(c) : state.active.has(c.id)}" style="--c:${c.color};--k:${c.ink}">
       <span class="ic">${c.icon}</span>${esc(c.plural)}
     </button>`).join('') + '<button class="chip wishchip" data-wish="1">Fehlt was?</button>';
-  $('#chips').insertAdjacentHTML('afterbegin', `<button class="chip roundchip" data-round="1" aria-pressed="${!!state.round.plan}"><span class="ic">${ICON_ROUTE}</span>Erledigungs-Runde</button>`);
+  $('#chips').insertAdjacentHTML('afterbegin', `<button class="chip roundchip" data-round="1" aria-pressed="${!!state.round.plan}"><span class="ic">${ICON_ROUTE}</span>Erledigungs-Runde</button><button class="chip roundchip wohinchip" data-wohin-open="1" aria-pressed="${!!(state.wohin || state.wohinPick)}"><span class="ic">${BIN_ICON}</span>Wohin damit?</button>`);
 }
 function renderProviders() {
+  const W = state.wohin && WOHIN_BY_ID[state.wohin];
+  $('#wohinbar').hidden = !W;
+  $('#wohinbar').innerHTML = W ? `<button class="chip pv" id="wb-x" aria-label="„Wohin damit?“ beenden">✕</button><span class="rb-t">Wohin mit: ${esc(W.label)}</span><button class="chip pv" id="wb-change">Ändern</button>` : '';
   for (const g of GROUPS) {
-    $('#' + g.row).hidden = !groupOn(g);
+    $('#' + g.row).hidden = !groupOn(g) || !!W;
     $('#' + g.row).innerHTML = g.members.map((id) => { const c = CATEGORY_BY_ID[id]; return `<button class="chip pv ct" data-ct="${id}" aria-pressed="${groupSel(g).has(id)}" style="--c:${c.color};--k:${c.ink}"><span class="ic">${c.icon}</span>${esc(g.labels[id])}</button>`; }).join('');
   }
   const show = PARCEL.some((c) => state.active.has(c));
@@ -500,13 +528,13 @@ function renderProviders() {
   $('#cards').hidden = !state.active.has(FUEL);
   $('#cards').innerHTML = CARDS.map((c) => `<button class="chip pv cd" data-card="${c.id}" aria-pressed="${state.cards.has(c.id)}" style="--c:${fuel.color};--k:${fuel.ink}">${esc(c.label)}</button>`).join('');
   const atm = CATEGORY_BY_ID.geldautomat;
-  $('#atmrow').hidden = !state.active.has('geldautomat');
+  $('#atmrow').hidden = !state.active.has('geldautomat') || !!W;
   $('#atmrow').innerHTML = ATM_NETS.map((n) => `<button class="chip pv cd" data-atm="${n.id}" aria-pressed="${state.atm.has(n.id)}" style="--c:${atm.color};--k:${atm.ink}">${esc(n.label)}</button>`).join('');
   const ev = CATEGORY_BY_ID.ladesaeule;
-  $('#evrow').hidden = !state.active.has('ladesaeule');
+  $('#evrow').hidden = !state.active.has('ladesaeule') || !!W;
   $('#evrow').innerHTML = EV_FILTERS.map((f, i) => `${i && EV_FILTERS[i - 1].grp !== f.grp ? '<span class="chip-sep" aria-hidden="true"></span>' : ''}<button class="chip pv cd" data-ev="${f.id}" aria-pressed="${state.ev.has(f.id)}" style="--c:${ev.color};--k:${ev.ink}">${esc(f.label)}</button>`).join('');
   const wc = CATEGORY_BY_ID.toilette;
-  $('#wcrow').hidden = !state.active.has('toilette');
+  $('#wcrow').hidden = !state.active.has('toilette') || !!W;
   $('#wcrow').innerHTML = WC_FILTERS.map((f) => `<button class="chip pv cd" data-wc="${f.id}" aria-pressed="${state.wc.has(f.id)}" style="--c:${wc.color};--k:${wc.ink}">${esc(f.label)}</button>`).join('');
   layoutSheet();
 }
@@ -576,6 +604,7 @@ for (const g of GROUPS) $('#' + g.row).addEventListener('click', (e) => {
 $('#chips').addEventListener('click', (e) => {
   const b = e.target.closest('.chip[data-id]');
   if (!b) return;
+  if (state.wohin || state.wohinPick) endWohin(); // normale Kategorien: „Wohin damit?“ verlassen
   const id = b.dataset.id;
   const grp = GROUPS.find((g) => g.id === id);
   if (grp) syncGroup(grp, !groupOn(grp)); // Gruppe an/aus
@@ -633,6 +662,7 @@ const geojson = () => fc(state.items.map((it, i) => pointF(it.lon, it.lat, {
   ev: it.c === 'ladesaeule' ? `|${evTags(it).join('|')}|` : '',
   an: it.c === 'geldautomat' ? atmNet(it) : '',
   wf: it.c === 'toilette' ? `|${wcTags(it).join('|')}|` : '',
+  wr: it.t && Object.keys(it.t).some((k) => k.startsWith('recycling:')) ? `|${recycleFlags(it.t).join('|')}|` : '',
   u: it.src === 'user' && !isConfirmed(it) ? 1 : 0,
 })));
 
@@ -642,6 +672,12 @@ function applyFilter() {
   if (!allProviders()) conds.push(['any', ['!', ['in', ['get', 'c'], ['literal', PARCEL]]], ...[...state.providers].map((p) => ['in', `|${p}|`, ['get', 'pv']])]);
   if (state.cards.size) conds.push(['any', ['!=', ['get', 'c'], FUEL], ['all', ...[...state.cards].map((c) => ['in', `|${c}|`, ['get', 'fc']])]]);
   if (state.atm.size) conds.push(['any', ['!=', ['get', 'c'], 'geldautomat'], ['in', ['get', 'an'], ['literal', [...state.atm]]]]);
+  const W = state.wohin && WOHIN_BY_ID[state.wohin];
+  if (W) {
+    const parts = W.cats.map((c) => (W.flags ? ['all', ['==', ['get', 'c'], c], ['any', ...W.flags.map((f) => ['in', `|${f}|`, ['get', 'wr']])]] : ['==', ['get', 'c'], c]));
+    if (W.centres) parts.push(['==', ['get', 'c'], 'wertstoffhof']);
+    conds.push(parts.length ? ['any', ...parts] : ['==', 1, 0]);
+  }
   if (state.wc.size) conds.push(['any', ['!=', ['get', 'c'], 'toilette'], ['all', ...[...state.wc].map((id) => ['in', `|${id}|`, ['get', 'wf']])]]);
   if (state.ev.size) conds.push(['any', ['!=', ['get', 'c'], 'ladesaeule'], ['all', ...evGroups().map((ids) => ['any', ...ids.map((id) => ['in', `|${id}|`, ['get', 'ev']])])]]);
   map.setFilter('pois', conds.length === 1 ? conds[0] : ['all', ...conds]);
@@ -671,6 +707,11 @@ async function setupLayers() {
     },
     paint: { 'icon-opacity': ['case', ['==', ['get', 'u'], 1], 0.5, 1] },
   });
+  if (!map.getSource('gapcell')) {
+    map.addSource('gapcell', { type: 'geojson', data: fc([]) });
+    map.addLayer({ id: 'gapcell-fill', type: 'fill', source: 'gapcell', paint: { 'fill-color': '#E8742A', 'fill-opacity': 0.15 } });
+    map.addLayer({ id: 'gapcell-line', type: 'line', source: 'gapcell', paint: { 'line-color': '#E8742A', 'line-width': 2, 'line-dasharray': [2, 1.5] } });
+  }
   if (!map.getSource('round')) {
     map.addSource('round', { type: 'geojson', data: fc([]) });
     map.addLayer({ id: 'round-line', type: 'line', source: 'round', layout: { 'line-cap': 'round', 'line-join': 'round' }, paint: { 'line-color': '#173B2C', 'line-width': 3, 'line-opacity': 0.75, 'line-dasharray': [2, 1.5] } }, 'pois');
@@ -958,6 +999,58 @@ function notdienstHint() {
   return `<a class="notdienst" href="${NOTDIENST_URL}" target="_blank" rel="noopener"><b>Welche Apotheke hat jetzt Notdienst?</b><span>Offizielle Notdienstsuche der Apothekerkammern öffnen ↗</span></a>`;
 }
 const wishLink = () => '<button class="link wish-link" data-wish="1">Fehlt dir was in der App? Sag’s uns</button>';
+// ---------- „Wohin damit?“ ----------
+function ovTabsHtml() {
+  const tab = state.ovTab === 'wohin' ? 'wohin' : 'find';
+  return `<div class="ov-tabs" role="tablist" aria-label="Was suchst du?">
+    <button type="button" role="tab" data-ovtab="find" aria-selected="${tab === 'find'}">Wo finde ich …?</button>
+    <button type="button" role="tab" data-ovtab="wohin" aria-selected="${tab === 'wohin'}">Wohin damit?</button>
+  </div>`;
+}
+function wohinPickerHtml() {
+  const groups = [...new Set(WOHIN.map((w) => w.group))];
+  const head = state.wohinPick ? '<div class="sheet-h"><h2>Wohin damit?</h2><button class="link" id="wohin-back">Zurück</button></div>' : ovTabsHtml();
+  return `${head}
+    <p class="wohin-intro">Was willst du loswerden?</p>
+    ${groups.map((g) => `<div class="wish-sec">${esc(g)}</div><div class="wish-chips">${WOHIN.filter((w) => w.group === g).map((w) => `<button class="wchip${!w.cats.length && !w.centres ? ' rule-only' : ''}" data-wohin="${w.id}" aria-pressed="${state.wohin === w.id}">${esc(w.label)}</button>`).join('')}</div>`).join('')}
+    <p class="wohin-note">Orte laut OpenStreetMap, ohne Gewähr. ${esc(WOHIN_NOTE)}</p>`;
+}
+function wohinRuleHtml(W) {
+  if (!W.rule) return '';
+  const src = (W.src || []).map((x) => `<a href="${safeUrl(x.url)}" target="_blank" rel="noopener">${esc(x.label)}</a>`).join(' · ');
+  return `<div class="wohin-rule"><b>So geht’s</b><p>${esc(W.rule)}</p>${W.link ? `<a class="btn wohin-link" href="${safeUrl(W.link.url)}" target="_blank" rel="noopener">${esc(W.link.label)} ↗</a>` : ''}<p class="wohin-src">Quelle: ${src}. ${esc(WOHIN_NOTE)}</p></div>`;
+}
+function startWohin(id) {
+  const W = WOHIN_BY_ID[id];
+  if (!W) return;
+  if (!state.wohin) state.wohinPrev = { active: [...state.active], sel: GROUPS.map((g) => [...groupSel(g)]) };
+  state.wohin = id;
+  state.wohinPick = false;
+  state.active = new Set(wohinCats(W)); // nur für diese Ansicht – die gespeicherte Auswahl bleibt unverändert
+  if (state.selected) closeDetail();
+  zoomHint(); renderChips(); renderProviders(); applyFilter(); renderList();
+}
+function endWohin() {
+  const prev = state.wohinPrev;
+  if (prev && state.wohin) {
+    state.active = new Set(prev.active);
+    GROUPS.forEach((g, i) => { groupSel(g).clear(); prev.sel[i].forEach((c) => groupSel(g).add(c)); });
+  }
+  state.wohin = null; state.wohinPick = false; state.wohinPrev = null;
+  zoomHint(); renderChips(); renderProviders(); applyFilter();
+  if (!state.selected) renderList();
+}
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-ovtab]');
+  if (t) { state.ovTab = t.dataset.ovtab; renderList(); return; }
+  const w = e.target.closest('[data-wohin]');
+  if (w) { startWohin(w.dataset.wohin); return; }
+  if (e.target.closest('[data-wohin-open]')) { if (state.selected) closeDetail(); state.wohinPick = true; renderChips(); renderList(); return; }
+  if (e.target.closest('#wohin-back')) { state.wohinPick = false; renderChips(); renderList(); return; }
+  if (e.target.closest('#wb-x')) { endWohin(); return; }
+  if (e.target.closest('#wb-change')) { state.wohinPick = true; renderChips(); renderList(); }
+});
+
 function renderList() {
   if (!state.index) return;
   const ref = refPoint();
@@ -970,8 +1063,11 @@ function renderList() {
   });
   near.sort((a, b) => a.d - b.d);
   const list = near.slice(0, LIST_LIMIT);
+  if (state.wohinPick || (!state.active.size && !state.wohin && state.ovTab === 'wohin')) { body.innerHTML = wohinPickerHtml(); layoutSheet(); return; }
+  const W = state.wohin && WOHIN_BY_ID[state.wohin];
+  if (W && !W.cats.length && !W.centres) { body.innerHTML = `<div class="sheet-h"><h2>Wohin mit: ${esc(W.label)}</h2></div>${wohinRuleHtml(W)}<div class="empty">Dafür gibt es keine Orte auf der Karte – die Regel oben zeigt, wie es geht.</div>`; layoutSheet(); return; }
   if (!state.me && map.getZoom() < MIN_LOAD_ZOOM) {
-    body.innerHTML = `<div class="sheet-h"><h2>Wo suchst du? 🦊</h2></div>
+    body.innerHTML = `${W ? wohinRuleHtml(W) : ''}<div class="sheet-h"><h2>Wo suchst du? 🦊</h2></div>
       <button class="btn primary locate-cta" id="use-loc"${state.locating ? ' disabled' : ''}>${state.locating ? 'Standort wird gesucht …' : '📍 Meinen Standort verwenden'}</button>
       ${state.locError ? `<div class="hint loc-err">${esc(LOC_ERR[state.locError] || LOC_ERR[2])}</div>` : ''}
       <div class="empty">Oder schieb die Karte zu deinem Ort und zoom hinein. Dein Standort bleibt auf deinem Gerät und wird nicht gespeichert.</div>`;
@@ -980,7 +1076,7 @@ function renderList() {
     return;
   }
   if (!state.active.size) {
-    body.innerHTML = '<div class="sheet-h"><h2>Was suchst du?</h2></div><div class="empty">Tippe oben auf eine oder mehrere Kategorien, z. B. Briefkästen oder Abfall & Container.</div>';
+    body.innerHTML = `${ovTabsHtml()}<div class="empty">Tippe oben auf eine oder mehrere Kategorien, z. B. Briefkästen oder Abfall & Container.</div>`;
     layoutSheet();
     return;
   }
@@ -988,10 +1084,12 @@ function renderList() {
   const loadingHere = keysAround(ref.lat, ref.lon, 0).some((k) => state.loading.has(k));
   const empty = loadingHere ? 'Orte werden geladen …' : (tileKey(ref.lat, ref.lon) in state.index.tiles ? 'In der Nähe ist nichts eingetragen.' : 'Dieses Gebiet ist noch nicht in der App (bisher: ' + state.index.regions.join(', ') + ').');
   body.innerHTML = `
-    <div class="sheet-h"><h2>Nächste ${esc(only)}</h2><span class="from">${ref.mine ? '' : 'ab Kartenmitte'}</span></div>
+    <div class="sheet-h"><h2>${W ? `Wohin mit: ${esc(W.label)}` : `Nächste ${esc(only)}`}</h2><span class="from">${ref.mine ? '' : 'ab Kartenmitte'}</span></div>
+    ${W ? wohinRuleHtml(W) : ''}
     ${notdienstHint()}
-    ${list.length ? list.map((x) => rowHtml(x.it, ref)).join('') : `<div class="empty">${esc(empty)}</div>`}
+    ${list.length ? list.map((x) => rowHtml(x.it, ref)).join('') : `<div class="empty">${esc(empty)}</div>${!loadingHere && !W && state.active.size === 1 && GAP_LABEL[[...state.active][0]] && MITMACHEN && R.enabled() ? `<button class="btn gap-here" data-gap-here="${[...state.active][0]}">Fehlt hier: ${esc(GAP_LABEL[[...state.active][0]])}? Wunsch senden</button>` : ''}`}
     ${list.length > PEEK_ROWS && state.mode === 'peek' ? '<div class="hint">Nach oben ziehen für mehr</div>' : ''}
+    ${W ? `<div class="hint wohin-note">Orte laut OpenStreetMap, ohne Gewähr – bitte vor Ort prüfen.${W.few ? ' In den Kartendaten sind nur wenige Sammelstellen eingetragen; im Handel gibt es viel mehr.' : ''}</div>` : ''}
     ${providerHint()}
     ${cardHint()}
     ${wishLink()}`;
@@ -1025,11 +1123,12 @@ function openDetail(it, fly = false) {
     ${fuelHint(it)}
     <div class="actions">
       <a class="btn primary" data-route="${it._i}" href="${routeUrl(it)}" target="_blank" rel="noopener">${ICON_ROUTE}Route</a>
-      ${R.enabled() ? (it.src === 'user' && !isConfirmed(it)
+      ${R.enabled() && (MITMACHEN || it.c !== 'sammelstelle') ? (it.src === 'user' && !isConfirmed(it)
         ? `<button class="btn" id="confirm">Gibt es (${confirmCount(it)}/${R.CONFIRM_NEEDED})</button><button class="btn" id="deny">Gibt es nicht</button>`
         : `<button class="btn" id="report-btn">${ICON_FLAG}Melden</button>`)
         : (!it.src ? `<a class="btn" href="${noteUrl(it)}" target="_blank" rel="noopener">${ICON_FLAG}Korrigieren</a>` : '')}
     </div>
+    ${miniHtml(it)}
     ${state.nav ? `<div class="navpref">Navigation mit ${esc(NAV[state.nav].name)} · <button id="navchange">ändern</button></div>` : ''}
     <div class="src">${sourceLine(it, checked)}</div>
     ${it.src === 'user' || repOf(it) ? `<div class="src"><a href="${esc(dsaMailUrl(it))}">Rechtswidrigen Inhalt melden</a></div>` : ''}
@@ -1039,9 +1138,70 @@ function openDetail(it, fly = false) {
   $('#report-btn')?.addEventListener('click', () => openReport(it));
   $('#confirm')?.addEventListener('click', () => submit({ place_id: it.id, category: it.c, kind: 'confirm', lat: it.lat, lon: it.lon }, 'Danke für die Bestätigung!'));
   $('#deny')?.addEventListener('click', () => submit({ place_id: it.id, category: it.c, kind: 'gone', lat: it.lat, lon: it.lon }, 'Danke! Nach zwei solchen Meldungen wird der Ort ausgeblendet.'));
+  body.querySelectorAll('[data-mini]').forEach((b) => b.addEventListener('click', () => answerMini(it, b.dataset.q, b.dataset.mini, b.dataset.val)));
   layoutSheet();
   if (fly) map.easeTo({ center: [it.lon, it.lat], zoom: Math.max(map.getZoom(), 16) });
 }
+// ---------- Mini-Aufgaben: eine kurze Frage zu alten oder fehlenden Angaben (nur in der geöffneten App) ----------
+const MINI_MAX = 3; // höchstens 3 Fragen je Ort und Gerät
+const MINI_DAYS = 180; // dieselbe Frage frühestens nach einem halben Jahr wieder
+function miniDone() { try { return JSON.parse(localStorage.getItem('miniDone') || '{}'); } catch { return {}; } }
+function markMini(placeId, q) {
+  const d = miniDone();
+  const cut = Date.now() - MINI_DAYS * 864e5;
+  for (const k of Object.keys(d)) if (d[k] < cut) delete d[k]; // alte Einträge aufräumen
+  d[`${placeId}|${q}`] = Date.now();
+  store.set('miniDone', d);
+}
+const EXISTS_Q = { glas: 'Steht der Container noch hier?', papier: 'Steht der Container noch hier?', altkleider: 'Steht der Container noch hier?', briefkasten: 'Hängt der Briefkasten noch hier?', toilette: 'Gibt es die Toilette noch?', geldautomat: 'Gibt es den Geldautomaten noch?', packstation: 'Steht die Paketstation noch hier?', sammelstelle: 'Gibt es die Sammelstelle noch?' };
+function miniQuestion(it) {
+  if (!MITMACHEN || !R.enabled() || it.src === 'user' || it.adding) return null;
+  const t = it.t || {}, r = repOf(it) || { confirm: new Set(), gone: new Set(), facts: {} };
+  const done = miniDone();
+  const asked = Object.keys(done).filter((k) => k.startsWith(it.id + '|'));
+  if (asked.length >= MINI_MAX) return null;
+  const checked = t['check_date:collection_times'] || t.check_date || t['survey:date'] || '';
+  const old = !checked || checked < `${new Date().getFullYear() - 2}`;
+  const yn = (yes, no) => [['Ja', 'fact', yes], ['Nein', 'fact', no]];
+  const qs = [];
+  if (old && EXISTS_Q[it.c] && r.confirm.size < R.CONFIRM_NEEDED && !r.gone.size) qs.push({ id: 'exists', text: EXISTS_Q[it.c], answers: [['Ja', 'confirm'], ['Nein', 'gone']] });
+  if (it.c === 'toilette') {
+    if (!t.fee) qs.push({ id: 'fee', text: 'Ist die Toilette kostenlos?', answers: yn('fee_no', 'fee_yes'), n: (r.facts.fee_no?.size || 0) + (r.facts.fee_yes?.size || 0) });
+    if (!t.wheelchair) qs.push({ id: 'wc', text: 'Ist die Toilette barrierefrei?', answers: yn('wc_yes', 'wc_no'), n: (r.facts.wc_yes?.size || 0) + (r.facts.wc_no?.size || 0) });
+    if (!t.changing_table) qs.push({ id: 'baby', text: 'Gibt es dort einen Wickeltisch?', answers: yn('baby_yes', 'baby_no'), n: (r.facts.baby_yes?.size || 0) + (r.facts.baby_no?.size || 0) });
+  }
+  if (it.c === 'briefkasten' && t.collection_times && old) {
+    const w = weekSummary(parseHours(t.collection_times, 'points'));
+    if (w) qs.push({ id: 'times', text: `Stimmt die Leerungszeit „${w}“?`, answers: [['Ja', 'fact', 'times_ok'], ['Nein', 'hours']], n: r.facts.times_ok?.size || 0 });
+  }
+  // Wechselnde Fragen: zuerst „gibt es noch?“, sonst das Merkmal, zu dem es bisher die wenigsten Antworten gibt
+  const open = qs.filter((q) => !done[`${it.id}|${q.id}`]);
+  open.sort((a, b) => (a.id === 'exists' ? -1 : b.id === 'exists' ? 1 : (a.n || 0) - (b.n || 0)));
+  return open[0] || null;
+}
+function miniHtml(it) {
+  const q = miniQuestion(it);
+  if (!q) return '';
+  const old = !(it.t?.check_date || it.t?.['survey:date']) ? '' : ` · zuletzt geprüft ${esc(fmtDate(it.t.check_date || it.t['survey:date']))}`;
+  return `<div class="mini-q" role="group" aria-label="Kurze Frage">
+    <div class="mini-h"><b>Kurze Frage 🦊</b><span>${old}</span></div>
+    <p>${esc(q.text)}</p>
+    <div class="mini-a">${q.answers.map(([label, kind, val]) => `<button class="btn${label === 'Ja' ? ' primary' : ''}" data-q="${q.id}" data-mini="${kind}" data-val="${val || ''}">${label}</button>`).join('')}<button class="btn" data-q="${q.id}" data-mini="skip">Weiß nicht</button></div>
+    <small>Nur hier in der App – kein Standort im Hintergrund. Erst wenn mehrere dasselbe sagen, ändert sich die Anzeige.</small>
+  </div>`;
+}
+async function answerMini(it, q, kind, val) {
+  markMini(it.id, q);
+  if (kind !== 'skip') {
+    const report = { place_id: it.id, category: it.c, kind, lat: it.lat, lon: it.lon };
+    if (kind === 'fact') report.status = val;
+    const n = (store.get('miniCount', 0) || 0) + 1;
+    store.set('miniCount', n);
+    await submit(report, `Danke! Du hast schon ${n} ${n === 1 ? 'Frage' : 'Fragen'} beantwortet 🦊`);
+  }
+  if (state.selected === it) openDetail(it);
+}
+
 /** Meldeweg nach Art. 16 DSA: vorbefüllte E-Mail mit allen Pflichtangaben (kein Formular, keine Speicherung in der App). */
 function dsaMailUrl(it) {
   const lat = it.lat.toFixed(5), lon = it.lon.toFixed(5);
@@ -1454,7 +1614,103 @@ $('#roundbar').addEventListener('click', (e) => {
   else if (e.target.closest('#rb-list')) { renderRoundForm(); showRoundResult(state.round.plan); $('#round').hidden = false; }
 });
 
+// ---------- „Hier fehlt was“: Wunsch für eine Stelle, nur als grobes Raster ----------
+const GAP_ITEMS = [['toilette', 'Öffentliche Toilette'], ['glas', 'Glascontainer'], ['papier', 'Papiercontainer'], ['altkleider', 'Altkleidercontainer'],
+  ['briefkasten', 'Briefkasten'], ['geldautomat', 'Geldautomat'], ['packstation', 'Paketstation'], ['sammelstelle', 'Batterie-/Elektro-Sammelstelle'],
+  ['ladesaeule', 'Ladesäule'], ['aed', 'Defibrillator'], ['trinkwasser', 'Trinkbrunnen'], ['buecher', 'Bücherschrank'], ['wickeln', 'Wickeltisch'],
+  ['sitzbank', 'Sitzbank'], ['fahrrad', 'Fahrrad-Reparatur'], ['anderes', 'Etwas anderes']];
+const GAP_LABEL = Object.fromEntries(GAP_ITEMS);
+const GAP_PER_DAY = 10; // auf dem Gerät: höchstens 10 Wünsche pro Tag
+function gapCellPolygon(lat, lon) {
+  const y = Math.floor(lat / R.GAP_LAT), x = Math.floor(lon / R.GAP_LON);
+  const s = y * R.GAP_LAT, n = (y + 1) * R.GAP_LAT, w = x * R.GAP_LON, e = (x + 1) * R.GAP_LON;
+  return fc([{ type: 'Feature', properties: {}, geometry: { type: 'Polygon', coordinates: [[[w, s], [e, s], [e, n], [w, n], [w, s]]] } }]);
+}
+function openGap(lat, lon, item = null) {
+  if (!MITMACHEN || !R.enabled() || !$('#gap').hidden || state.selected?.adding) return;
+  state.gap = { lat, lon, item };
+  stopGapPick();
+  $('#gap-items').innerHTML = GAP_ITEMS.map(([id, label]) => `<button class="wchip" data-gapitem="${id}" aria-pressed="${id === item}">${esc(label)}</button>`).join('');
+  $('#gap-send').disabled = !item;
+  $('#gap-send').textContent = 'Wunsch senden';
+  map.getSource('gapcell')?.setData(gapCellPolygon(lat, lon));
+  $('#gap').hidden = false;
+}
+function closeGap() { $('#gap').hidden = true; state.gap = null; map.getSource('gapcell')?.setData(fc([])); }
+function startGapPick() {
+  state.gapPick = true;
+  $('#crosshair').hidden = false;
+  $('#gapbar').innerHTML = '<button class="chip pv" id="gb-x" aria-label="Abbrechen">✕</button><span class="rb-t">Karte an die Stelle schieben</span><button class="chip pv" id="gb-go">Hier fehlt was</button>';
+  $('#gapbar').hidden = false;
+  layoutSheet();
+}
+function stopGapPick() {
+  if (!state.gapPick) return;
+  state.gapPick = false;
+  if (!state.selected?.adding) $('#crosshair').hidden = true;
+  $('#gapbar').hidden = true;
+  layoutSheet();
+}
+$('#gap').addEventListener('click', (e) => {
+  const b = e.target.closest('[data-gapitem]');
+  if (b && state.gap) {
+    state.gap.item = b.dataset.gapitem;
+    $('#gap-items').querySelectorAll('[data-gapitem]').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+    $('#gap-send').disabled = false;
+  } else if (e.target === $('#gap')) closeGap();
+});
+$('#gap-close').addEventListener('click', closeGap);
+$('#gap-send').addEventListener('click', async () => {
+  const g = state.gap;
+  if (!g || !g.item) return;
+  const today = new Date().toISOString().slice(0, 10);
+  const day = store.get('gapDay', {});
+  if (day.d === today && day.n >= GAP_PER_DAY) { toast('Für heute sind genug Wünsche notiert – danke!'); closeGap(); return; }
+  $('#gap-send').disabled = true;
+  try {
+    await R.sendGap(g.item, g.lat, g.lon); // es wird nur die Rasterzelle gesendet, nicht der Punkt
+    store.set('gapDay', { d: today, n: day.d === today ? day.n + 1 : 1 });
+    $('#gap').hidden = true;
+    state.gap = null;
+    toast('Danke, Wunsch notiert! Aus vielen Wünschen entsteht eine anonyme Lücken-Karte für Städte.');
+    setTimeout(() => map.getSource('gapcell')?.setData(fc([])), 2500);
+  } catch (err) {
+    $('#gap-send').disabled = false;
+    toast(err.message);
+  }
+});
+document.addEventListener('click', (e) => {
+  const h = e.target.closest('[data-gap-here]');
+  if (h) { const r = refPoint(); openGap(r.lat, r.lon, h.dataset.gapHere); return; }
+  if (e.target.closest('#wish-gap')) { $('#wish').hidden = true; startGapPick(); return; }
+  if (e.target.closest('#gb-x')) { stopGapPick(); return; }
+  if (e.target.closest('#gb-go')) { const c = map.getCenter(); openGap(c.lat, c.lng); }
+});
+// Lange auf die Karte drücken (Handy) bzw. Rechtsklick (PC)
+let lpTimer = null, lpAt = null;
+const lpCancel = () => { clearTimeout(lpTimer); lpTimer = null; };
+map.on('touchstart', (e) => {
+  lpCancel();
+  if (e.originalEvent.touches?.length !== 1) return;
+  lpAt = e.point;
+  const ll = e.lngLat;
+  lpTimer = setTimeout(() => { lpTimer = null; openGap(ll.lat, ll.lng); }, 650);
+});
+map.on('touchmove', (e) => { if (lpTimer && lpAt && (Math.abs(e.point.x - lpAt.x) > 10 || Math.abs(e.point.y - lpAt.y) > 10)) lpCancel(); });
+map.on('touchend', lpCancel);
+map.on('touchcancel', lpCancel);
+map.on('dragstart', lpCancel);
+map.on('zoomstart', lpCancel);
+map.on('contextmenu', (e) => { e.originalEvent.preventDefault?.(); openGap(e.lngLat.lat, e.lngLat.lng); });
+// Einmaliger Tipp ab dem dritten Start
+try {
+  const starts = (store.get('starts', 0) || 0) + 1;
+  store.set('starts', starts);
+  if (MITMACHEN && starts >= 3 && !store.get('gapTip', false) && R.enabled()) setTimeout(() => { if ($('#gap').hidden) { toast('Tipp: Lange auf die Karte drücken, wenn an einer Stelle etwas fehlt.'); store.set('gapTip', true); } }, 5000);
+} catch { /* egal */ }
+
 function openWish() {
+  $('#wish-gap').hidden = !MITMACHEN;
   $('#wish').querySelectorAll('.wchip').forEach((b) => b.setAttribute('aria-pressed', 'false'));
   $('#wish-send').disabled = true;
   $('#wish-send').textContent = wishSent ? 'Danke, schon gesendet!' : 'Abschicken';

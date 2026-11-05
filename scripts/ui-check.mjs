@@ -104,7 +104,7 @@ async function run(kind, mobile) {
       if (chip.id === 'container') {
         if (await page.locator('#containers').isHidden()) bad(ctx, 'Container-Unterzeile erscheint nicht');
         const sub = await page.$$eval('#containers .chip', (a) => a.map((b) => [...b.childNodes].filter((n) => n.nodeType === 3).map((n) => n.textContent).join('').trim()));
-        if (sub.join(',') !== 'Glas,Papier,Altkleider,Wertstoffhöfe') bad(ctx, `Container-Unterzeile falsch: ${sub.join(', ')}`);
+        if (sub.join(',') !== 'Glas,Papier,Altkleider,Sammelstellen,Wertstoffhöfe') bad(ctx, `Container-Unterzeile falsch: ${sub.join(', ')}`);
         await groupCheck(page, ctx, chip, 'containers');
       }
       if (chip.id === 'parken') {
@@ -405,6 +405,189 @@ async function shortcutCheck() {
   await browser.close();
 }
 await shortcutCheck();
+
+// „Wohin damit?“: Auswahl, jeder Gegenstand, Regel mit Quelle, passende Orte, Beenden stellt die alte Auswahl wieder her
+async function wohinCheck() {
+  const { WOHIN, wohinCats } = await import('../src/wohin.js');
+  const browser = await chromium.launch();
+  for (const zoom of [1, 1.35]) {
+    const ctx = `Wohin damit · Schrift ${Math.round(zoom * 100)} %`;
+    const context = await browser.newContext({ viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true, geolocation: { latitude: PLACES[0].lat, longitude: PLACES[0].lon }, permissions: ['geolocation'], locale: 'de-DE' });
+    await context.route(/openfreemap\.org/, (r) => (r.request().url().includes('/styles/') ? r.fulfill({ contentType: 'application/json', body: BLANK_STYLE }) : r.abort()));
+    await context.route(/supabase\.co/, (r) => r.fulfill({ contentType: 'application/json', body: '[]' }));
+    await context.addInitScript((z) => { try { localStorage.clear(); localStorage.setItem('welcomed', '1'); localStorage.setItem('supportHidden', '1'); } catch { /* */ } document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.zoom = String(z); }); }, zoom);
+    const page = await context.newPage();
+    page.on('pageerror', (e) => { if (!/WebGL/.test(e.message)) bad(ctx, `JavaScript-Fehler: ${e.message}`); });
+    await page.goto(BASE);
+    await page.waitForTimeout(3000);
+    const tap = (sel) => page.locator(sel).first().evaluate((el) => el.click());
+    const visible = async (sel) => page.evaluate((q) => {
+      const b = document.querySelector(q); if (!b) return 'fehlt';
+      b.scrollIntoView({ block: 'nearest' });
+      const r = b.getBoundingClientRect();
+      if (r.bottom > innerHeight + 1 || r.top < 0 || r.height === 0) return 'außerhalb des Bildschirms';
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return hit === b || b.contains(hit) ? 'ok' : 'verdeckt';
+    }, sel);
+    // Startkarte: Umschalter „Wo finde ich …? / Wohin damit?“
+    if (!(await page.locator('.ov-tabs [data-ovtab="wohin"]').count())) bad(ctx, 'Umschalter „Wohin damit?“ fehlt auf der Startkarte');
+    else {
+      await tap('.ov-tabs [data-ovtab="wohin"]');
+      await page.waitForTimeout(300);
+      if ((await page.locator('#sheet-body [data-wohin]').count()) !== WOHIN.length) bad(ctx, 'Auswahl „Wohin damit?“ unvollständig');
+      await tap('.ov-tabs [data-ovtab="find"]');
+    }
+    // Vorher eine normale Kategorie wählen – nach dem Beenden muss sie wieder da sein
+    await tap('#chips .chip[data-id="briefkasten"]');
+    await page.waitForTimeout(800);
+    for (const w of WOHIN) {
+      await tap('#chips [data-wohin-open]');
+      await page.waitForTimeout(250);
+      const btn = `#sheet-body [data-wohin="${w.id}"]`;
+      const v = await visible(btn);
+      if (v !== 'ok') bad(ctx, `Auswahl „${w.label}“ ${v}`);
+      await tap(btn);
+      await page.waitForTimeout(700);
+      const cats = await activeCats(page);
+      const want = wohinCats(w).sort().join(',');
+      if (cats.join(',') !== want) bad(ctx, `„${w.label}“: aktiv ${cats.join(', ') || 'nichts'} statt ${want || 'nichts'}`);
+      if (await page.locator('#wohinbar').isHidden()) bad(ctx, `„${w.label}“: Leiste „Wohin mit“ fehlt`);
+      if (w.rule) {
+        const rule = await page.locator('.wohin-rule').innerText().catch(() => '');
+        if (!rule.includes('Quelle') || !rule.includes('Abfallsatzung')) bad(ctx, `„${w.label}“: Regel ohne Quelle oder Hinweis auf die Kommune`);
+        if (w.src && !(await page.locator('.wohin-rule .wohin-src a').count())) bad(ctx, `„${w.label}“: Quelle nicht verlinkt`);
+      }
+      if (w.link && !(await page.locator('.wohin-rule .wohin-link').count())) bad(ctx, `„${w.label}“: Link fehlt`);
+      const allowed = wohinCats(w);
+      const wrong = await page.$$eval('#sheet-body .row', (a, ok) => a.filter((r) => !ok.includes(r.dataset.c)).length, allowed);
+      if (wrong) bad(ctx, `„${w.label}“: ${wrong} unpassende Orte in der Liste`);
+      const txt = await page.locator('#sheet-body').innerText().catch(() => '');
+      if (/undefined|null|NaN|\[object/.test(txt)) bad(ctx, `„${w.label}“: Anzeige enthält undefined/NaN`);
+    }
+    await tap('#wb-x');
+    await page.waitForTimeout(600);
+    const back = await activeCats(page);
+    if (back.join(',') !== 'briefkasten') bad(ctx, `Nach „Wohin damit“ beenden: ${back.join(', ') || 'nichts'} statt Briefkästen`);
+    if (!(await page.locator('#wohinbar').isHidden())) bad(ctx, 'Leiste „Wohin mit“ bleibt nach dem Beenden');
+    await context.close();
+  }
+  await browser.close();
+}
+await wohinCheck();
+
+// „Hier fehlt was“ und Mini-Aufgaben: was gesendet wird (nur Raster bzw. feste Antworten), Ablauf, Knöpfe erreichbar
+async function mitmachCheck() {
+  const { gapCell } = await import('../src/reports.js');
+  const browser = await chromium.launch();
+  for (const zoom of [1, 1.35]) {
+    const ctx = `Mitmachen · Schrift ${Math.round(zoom * 100)} %`;
+    const sent = [];
+    const context = await browser.newContext({ viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true, geolocation: { latitude: PLACES[0].lat, longitude: PLACES[0].lon }, permissions: ['geolocation'], locale: 'de-DE' });
+    await context.route(/openfreemap\.org/, (r) => (r.request().url().includes('/styles/') ? r.fulfill({ contentType: 'application/json', body: BLANK_STYLE }) : r.abort()));
+    await context.route(/supabase\.co/, (r) => {
+      const q = r.request();
+      if (q.method() === 'POST' && /\/rest\/v1\/(gaps|reports)$/.test(new URL(q.url()).pathname)) { sent.push({ path: new URL(q.url()).pathname, body: q.postDataJSON() }); return r.fulfill({ status: 201, body: '' }); }
+      return r.fulfill({ contentType: 'application/json', body: '[]' });
+    });
+    await context.addInitScript((z) => { try { localStorage.clear(); localStorage.setItem('welcomed', '1'); localStorage.setItem('supportHidden', '1'); } catch { /* */ } document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.zoom = String(z); }); }, zoom);
+    const page = await context.newPage();
+    page.on('pageerror', (e) => { if (!/WebGL/.test(e.message)) bad(ctx, `JavaScript-Fehler: ${e.message}`); });
+    await page.goto(BASE);
+    await page.waitForTimeout(3000);
+    if ((await page.evaluate(() => document.documentElement.dataset.mitmachen)) !== '1') {
+      notes.push(`[${ctx}] „Hier fehlt was“/Mini-Aufgaben noch ausgeschaltet (Datenbank-Erweiterung fehlt) – übersprungen`);
+      if (await page.locator('.mini-q').count()) bad(ctx, 'Mini-Aufgabe sichtbar, obwohl ausgeschaltet');
+      await context.close(); continue;
+    }
+    const tap = (sel) => page.locator(sel).first().evaluate((el) => el.click());
+    const visible = async (sel) => page.evaluate((q) => {
+      const b = document.querySelector(q); if (!b) return 'fehlt';
+      b.scrollIntoView({ block: 'nearest' });
+      const r = b.getBoundingClientRect();
+      if (r.bottom > innerHeight + 1 || r.top < 0 || r.height === 0) return 'außerhalb des Bildschirms';
+      const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+      return hit === b || b.contains(hit) ? 'ok' : 'verdeckt';
+    }, sel);
+
+    // A) „Fehlt was?“ → „An einer bestimmten Stelle“ → Fadenkreuz → Hier fehlt was
+    await tap('#chips [data-wish]');
+    await page.waitForTimeout(300);
+    if (!(await page.locator('#wish-gap').count())) bad(ctx, 'Knopf „An einer bestimmten Stelle“ fehlt im Fenster „Fehlt was?“');
+    else {
+      await tap('#wish-gap');
+      await page.waitForTimeout(300);
+      if (await page.locator('#gapbar').isHidden()) bad(ctx, 'Leiste „Karte an die Stelle schieben“ fehlt');
+      if (await page.locator('#crosshair').isHidden()) bad(ctx, 'Fadenkreuz fehlt');
+      await tap('#gb-go');
+      await page.waitForTimeout(300);
+      if (await page.locator('#gap').isHidden()) bad(ctx, '„Was fehlt hier?“ öffnet nicht');
+      if (!(await page.locator('#gap-send').isDisabled())) bad(ctx, '„Wunsch senden“ ohne Auswahl aktiv');
+      await tap('#gap-items [data-gapitem="toilette"]');
+      const v = await visible('#gap-send');
+      if (v !== 'ok') bad(ctx, `„Wunsch senden“ ${v}`);
+      await tap('#gap-send');
+      await page.waitForTimeout(500);
+      const g = sent.find((x) => x.path.endsWith('/gaps'));
+      if (!g) bad(ctx, 'Wunsch wurde nicht gesendet');
+      else {
+        const keys = Object.keys(g.body).sort().join(',');
+        if (keys !== 'cell,item') bad(ctx, `„Hier fehlt was“ sendet mehr als Art und Raster: ${keys}`);
+        if (!/^\d{4,6}_\d{3,5}$/.test(g.body.cell)) bad(ctx, `Rasterzelle falsch: ${g.body.cell}`);
+        const [cy, cx] = g.body.cell.split('_').map(Number), [py, px] = gapCell(PLACES[0].lat, PLACES[0].lon).split('_').map(Number);
+        if (Math.abs(cy - py) > 3 || Math.abs(cx - px) > 3) bad(ctx, `Rasterzelle liegt nicht bei der Kartenmitte: ${g.body.cell}`);
+      }
+      if (!(await page.locator('#gap').isHidden())) bad(ctx, 'Fenster bleibt nach dem Senden offen');
+    }
+
+    // A2) Lange auf die Karte drücken öffnet „Was fehlt hier?“ (kurzes Tippen nicht)
+    const press = (ms) => page.evaluate(async (dur) => {
+      const el = document.querySelector('.maplibregl-canvas'); const r = el.getBoundingClientRect();
+      const t = new Touch({ identifier: 1, target: el, clientX: r.left + r.width / 2, clientY: r.top + 220 });
+      el.dispatchEvent(new TouchEvent('touchstart', { touches: [t], targetTouches: [t], changedTouches: [t], bubbles: true, cancelable: true }));
+      await new Promise((res) => setTimeout(res, dur));
+      el.dispatchEvent(new TouchEvent('touchend', { touches: [], targetTouches: [], changedTouches: [t], bubbles: true, cancelable: true }));
+    }, ms);
+    await press(150);
+    await page.waitForTimeout(800);
+    if (!(await page.locator('#gap').isHidden())) { bad(ctx, 'Kurzes Tippen öffnet schon „Was fehlt hier?“'); await tap('#gap-close'); }
+    await press(900);
+    await page.waitForTimeout(400);
+    if (await page.locator('#gap').isHidden()) bad(ctx, 'Lange drücken öffnet „Was fehlt hier?“ nicht');
+    else await tap('#gap-close');
+
+    // B) Mini-Aufgaben: Toilette öffnen → Frage beantworten → nächste Frage wechselt → höchstens 3
+    await tap('#chips .chip[data-id="toilette"]');
+    await page.waitForTimeout(1500);
+    const rows = page.locator('#sheet-body .row');
+    if (!(await rows.count())) { bad(ctx, 'Keine Toiletten für die Mini-Aufgaben'); await context.close(); continue; }
+    const answered = [];
+    for (let k = 0; k < 4; k++) {
+      await rows.first().evaluate((el) => el.click()).catch(() => {});
+      await page.waitForTimeout(500);
+      const q = await page.locator('.mini-q p').textContent().catch(() => null);
+      if (!q) { if (k === 0) bad(ctx, 'Mini-Aufgabe: keine Frage angezeigt (Ort ohne Prüfdatum)'); break; }
+      if (k === 3) { if (q) bad(ctx, `Mehr als 3 Fragen zu einem Ort: „${q}“`); break; }
+      if (answered.includes(q)) bad(ctx, `Frage wiederholt sich: „${q}“`);
+      answered.push(q);
+      const v = await visible('.mini-q .mini-a .btn');
+      if (v !== 'ok') bad(ctx, `Antwort-Knopf ${v}`);
+      const before = sent.length;
+      if (k === 2) await tap('.mini-q [data-mini="skip"]'); else await tap('.mini-q .btn.primary');
+      await page.waitForTimeout(600);
+      if (k < 2) {
+        const r = sent.slice(before).find((x) => x.path.endsWith('/reports'));
+        if (!r) bad(ctx, `Antwort auf „${q}“ nicht gesendet`);
+        else if (!['confirm', 'fact', 'gone', 'hours'].includes(r.body.kind) || (r.body.kind === 'fact' && !/^(fee|wc|baby)_(yes|no)$|^times_ok$/.test(r.body.status || ''))) bad(ctx, `Antwort mit unerwartetem Inhalt: ${JSON.stringify(r.body).slice(0, 120)}`);
+        else if ('message' in r.body) bad(ctx, 'Mini-Aufgabe sendet Text');
+      } else if (sent.length !== before) bad(ctx, '„Weiß nicht“ sendet trotzdem etwas');
+      await tap('#close').catch(() => {});
+      await page.waitForTimeout(300);
+    }
+    await context.close();
+  }
+  await browser.close();
+}
+await mitmachCheck();
 
 // Android-App (Start mit ?src=twa): keine Ko-fi-Links sichtbar (Google-Play-Zahlungsrichtlinie)
 async function twaCheck() {

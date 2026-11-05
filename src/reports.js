@@ -59,7 +59,7 @@ export async function send(r) {
 export function summarize(rows) {
   const now = Date.now();
   const by = new Map();
-  const get = (id) => { if (!by.has(id)) by.set(id, { status: null, gone: new Set(), confirm: new Set(), closed: null, hours: null, notes: [], creator: null, newPlace: null }); return by.get(id); };
+  const get = (id) => { if (!by.has(id)) by.set(id, { status: null, gone: new Set(), confirm: new Set(), closed: null, hours: null, notes: [], creator: null, newPlace: null, facts: {} }); return by.get(id); };
   for (const r of rows) { // neueste zuerst
     const s = get(r.place_id);
     const exp = r.expires_at ? Date.parse(r.expires_at) : null;
@@ -71,6 +71,7 @@ export function summarize(rows) {
       case 'hours': if (!s.hours) s.hours = { text: r.message, at: Date.parse(r.created_at) }; break;
       case 'note': if (s.notes.length < 3 && r.message) s.notes.push({ text: r.message, at: Date.parse(r.created_at) }); break;
       case 'new': s.newPlace = r; s.creator = r.device; s.confirm.add(r.device); break;
+      case 'fact': if (r.status) (s.facts[r.status] ||= new Set()).add(r.device); break;
       default:
     }
   }
@@ -88,6 +89,15 @@ export function ago(ts) {
 }
 
 /** Wünsche und Rückmeldungen: nur die angetippten Auswahlpunkte, ohne Geräte-ID, ohne Text. */
+/** „Hier fehlt was“: nur Art + grobes Raster (ca. 500 m) + Datum – ohne Geräte-Kennung, ohne genauen Punkt. */
+export const GAP_LAT = 0.0045, GAP_LON = 0.007;
+export const gapCell = (lat, lon) => `${Math.floor(lat / GAP_LAT)}_${Math.floor(lon / GAP_LON)}`;
+export async function sendGap(item, lat, lon) {
+  if (!enabled()) throw new Error('Senden ist gerade nicht möglich.');
+  const res = await fetch(`${SUPABASE.url}/rest/v1/gaps`, { method: 'POST', headers: { ...H(), Prefer: 'return=minimal' }, body: JSON.stringify({ item, cell: gapCell(lat, lon) }) });
+  if (!res.ok) throw new Error('Konnte nicht gesendet werden. Bitte später erneut versuchen.');
+}
+
 export async function sendWishes(items) {
   if (!enabled()) throw new Error('Senden ist gerade nicht möglich.');
   const res = await fetch(`${SUPABASE.url}/rest/v1/wishes`, { method: 'POST', headers: { ...H(), Prefer: 'return=minimal' }, body: JSON.stringify(items.map((item) => ({ item }))) });

@@ -1,4 +1,5 @@
 // Gemeinsame Kategorie-Definitionen für Daten-Skript (Node) und App (Browser).
+import { SAMMEL_FLAGS } from './wohin.js';
 
 const svg = (inner) =>
   `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`;
@@ -30,6 +31,11 @@ export const CATEGORIES = [
     id: 'wertstoffhof', label: 'Wertstoffhof', plural: 'Wertstoffhöfe',
     color: '#5E7F1A', ink: '#FFFFFF',
     icon: svg('<path d="M5 20c0-8.5 5.5-14.5 15-15.5-.8 10-6.5 15.5-15 15.5z"/><path d="M5 20l8.5-8.5"/>'),
+  },
+  {
+    id: 'sammelstelle', label: 'Sammelstelle', plural: 'Sammelstellen (Batterien, Elektro …)',
+    color: '#8E3A59', ink: '#FFFFFF',
+    icon: svg('<rect x="7" y="6" width="10" height="15" rx="2"/><path d="M10 3h4v3h-4zM12.5 10l-2 3.5h3l-2 3.5"/>'),
   },
   {
     id: 'toilette', label: 'Toilette', plural: 'Öffentliche Toiletten',
@@ -101,6 +107,9 @@ export function classify(tags = {}) {
   // Nur echte Wertstoffhöfe (Annahme von Grünschnitt, Sperrmüll, Bioabfall usw.) und Abfall-Annahmestellen –
   // keine einzelnen Grünschnitt-Container
   if (!noAccess && ((a === 'recycling' && tags.recycling_type === 'centre') || a === 'waste_transfer_station')) out.push('wertstoffhof');
+  // Sammelstellen für Batterien, Elektro, Lampen, Grünschnitt … (Container oder Sammelbox in einem Geschäft) – keine Wertstoffhöfe
+  if (!noAccess && !(a === 'recycling' && tags.recycling_type === 'centre') && a !== 'waste_transfer_station'
+    && SAMMEL_FLAGS.some((f) => yes(tags['recycling:' + f]))) out.push('sammelstelle');
   if (a === 'toilets' && !noAccess) out.push('toilette');
   if (tags.highway === 'rest_area' || tags.highway === 'services') out.push('rastplatz');
   // Parken: nur öffentlich nutzbare Parkplätze – keine privaten, Kunden-, Anwohner- oder Firmenparkplätze,
@@ -280,7 +289,7 @@ export function fuelInfo(tags = {}) {
 export const fuelCardsPassing = (info) => CARDS.filter((c) => ['ok', 'likely'].includes(info.cards[c.id].lv)).map((c) => c.id);
 
 // Tags, die in die App übernommen werden (der Rest wird verworfen, um die Datei klein zu halten).
-const KEEP_BASE = /^(name|operator|brand|ref|collection_times|opening_hours|fee|charge|wheelchair|changing_table|centralkey|access|check_date.*|survey:date|capacity|recycling_type|recycling:.*|toilets.*|drive_through|description|level|addr:.*|amenity|highway|vending|socket:.*|motorcar|cash_in|indoor|unisex|male|female|post_box:type|parcel_mail_in|parcel_pickup|website|phone|contact:phone|healthcare|dispensing|atm|ref:.*|post_office.*|parcel_locker:.*|payment|autobahn:.*|parking|park_ride|maxstay|capacity:.*|hiking|supervised|carpool|maxheight)$/;
+const KEEP_BASE = /^(name|operator|brand|ref|collection_times|opening_hours|fee|charge|wheelchair|changing_table|centralkey|access|check_date.*|survey:date|capacity|recycling_type|recycling:.*|toilets.*|drive_through|description|level|addr:.*|amenity|highway|vending|socket:.*|motorcar|cash_in|indoor|unisex|male|female|post_box:type|parcel_mail_in|parcel_pickup|website|phone|contact:phone|healthcare|dispensing|atm|ref:.*|post_office.*|parcel_locker:.*|payment|autobahn:.*|parking|park_ride|maxstay|shop|capacity:.*|hiking|supervised|carpool|maxheight)$/;
 // Nur bei Tankstellen: angezeigte Kraftstoffe, Tankkarten und Ausstattung
 const KEEP_FUEL = new RegExp(`^(fuel:(diesel|octane_95|e5|e10|octane_98|octane_100|octane_102|lpg|cng|lng|biogas|adblue|HGV_diesel|hgv_diesel|hvo|HVO|hvo100|HVO100|e85|h70|h35|hydrogen)|payment:(${CARDS.flatMap((c) => c.osm).join('|')})|car_wash|shop|compressed_air|hgv|automated)$`);
 export const KEEP_TAG = (k, cats) => KEEP_BASE.test(k) || (Boolean(cats?.includes('tankstelle')) && KEEP_FUEL.test(k));

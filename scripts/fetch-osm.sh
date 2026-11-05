@@ -12,6 +12,7 @@ for url in $(jq -r '.regions[].url' config.json); do
   osmium tags-filter "work/r$i.pbf" \
     nwr/amenity=post_box,post_office,recycling,waste_transfer_station,toilets,parcel_locker,vending_machine,atm,bank,charging_station,pharmacy,fuel,parking,car_pooling \
     nwr/highway=rest_area,services \
+    nwr/recycling:batteries=yes nwr/recycling:small_electrical_appliances=yes nwr/recycling:small_appliances=yes nwr/recycling:electrical_appliances=yes nwr/recycling:electrical_items=yes nwr/recycling:electronics=yes nwr/recycling:computers=yes nwr/recycling:mobile_phones=yes nwr/recycling:low_energy_bulbs=yes nwr/recycling:fluorescent_tubes=yes nwr/recycling:light_bulbs=yes nwr/recycling:printer_cartridges=yes nwr/recycling:printer_toner_cartridges=yes nwr/recycling:cork=yes nwr/recycling:cooking_oil=yes nwr/recycling:engine_oil=yes nwr/recycling:green_waste=yes nwr/recycling:garden_waste=yes nwr/recycling:hazardous_waste=yes nwr/recycling:paint=yes \
     nwr/post_office nwr/post_office:type nwr/post_office:brand \
     n/place=city,town,village,suburb \
     -o "work/f$i.pbf" --overwrite
