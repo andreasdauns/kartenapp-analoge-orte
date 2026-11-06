@@ -7,3 +7,9 @@ android/build/
 android/app/build/
 *.jks
 *.keystore
+# Erzeugte Marketing-Dateien (Vorschauen, Videos, Bilder) nicht veröffentlichen
+marketing/reels/preview/
+marketing/reels/sheet/
+marketing/*.mp4
+marketing/stil-*.png
+marketing/post/*.png
