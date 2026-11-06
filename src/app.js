@@ -20,7 +20,7 @@ const CONTACT_MAIL = ['andreas.dauns.apps', 'gmail.com'].join('@');
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 // „Hier fehlt was“, Mini-Aufgaben und Meldungen zu Sammelstellen brauchen die Datenbank-Erweiterung
 // supabase/2026-11-05-mitmachen.sql – erst danach einschalten.
-const MITMACHEN = false;
+const MITMACHEN = true;
 document.documentElement.dataset.mitmachen = MITMACHEN ? '1' : '0';
 const store = {
   get(k, d) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
