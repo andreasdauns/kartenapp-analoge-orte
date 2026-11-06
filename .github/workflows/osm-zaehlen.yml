@@ -19,25 +19,22 @@ jobs:
         run: curl -sSfL --retry 3 -A "analoge-orte (github.com/andreasdauns/kartenapp-analoge-orte)" -o de.pbf https://download.geofabrik.de/europe/germany-latest.osm.pbf
       - name: Zählen
         run: |
-          osmium tags-filter de.pbf \
-            'nwr/recycling:*' nwr/amenity=recycling,waste_transfer_station,vending_machine \
-            nwr/emergency=defibrillator nwr/amenity=hospital \
-            -o f.pbf --overwrite
+          osmium tags-filter de.pbf nwr/changing_table nwr/amenity=changing_table nwr/diaper 'nwr/changing_table:*' -o w.pbf --overwrite
           {
-            echo "## OSM-Zählung Deutschland ($(date -u +%F))"
+            echo "## OSM-Zählung Wickelplätze Deutschland ($(date -u +%F))"
             echo '```'
-            echo "--- recycling:* = yes (alle Objekte, auch Läden)"
-            osmium tags-count f.pbf 'recycling:*=yes' -s count-desc | head -70
-            echo "--- Wertstoffhöfe / Container"
-            osmium tags-count f.pbf recycling_type amenity=waste_transfer_station -s count-desc
-            echo "--- Pfandautomaten"
-            osmium tags-count f.pbf vending=bottle_return
-            echo "--- Läden mit Sammelstelle (shop=* und recycling:batteries=yes)"
-            osmium tags-filter f.pbf nwr/recycling:batteries=yes -o b.pbf --overwrite
-            osmium tags-count b.pbf shop amenity -s count-desc | head -15
-            echo "--- Notfall"
-            osmium tags-count f.pbf emergency=defibrillator access -s count-desc | head -12
-            osmium tags-filter f.pbf nwr/amenity=hospital -o h.pbf --overwrite
-            osmium tags-count h.pbf emergency -s count-desc | head -5
+            echo "--- changing_table / diaper (Werte)"
+            osmium tags-count w.pbf changing_table diaper amenity=changing_table -s count-desc
+            echo "--- Objekte mit changing_table=yes oder limited: Art (amenity/shop/leisure/tourism)"
+            osmium tags-filter w.pbf nwr/changing_table=yes,limited nwr/amenity=changing_table nwr/diaper=yes -o y.pbf --overwrite
+            osmium tags-count y.pbf amenity shop leisure tourism highway building -s count-desc | head -40
+            echo "--- Zusatzangaben"
+            osmium tags-count y.pbf changing_table:location changing_table:fee changing_table:access changing_table:wheelchair toilets:wheelchair fee access wheelchair opening_hours -s count-desc | head -40
+            echo "--- Läden (shop) mit Wickelplatz, nach Marke/Betreiber"
+            osmium tags-filter y.pbf nwr/shop -o s.pbf --overwrite
+            osmium tags-count s.pbf brand -s count-desc | head -25
+            echo "--- Toiletten gesamt und davon mit changing_table"
+            osmium tags-filter de.pbf nwr/amenity=toilets -o t.pbf --overwrite
+            osmium tags-count t.pbf amenity=toilets changing_table -s count-desc
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
