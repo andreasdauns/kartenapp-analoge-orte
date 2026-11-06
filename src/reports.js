@@ -24,13 +24,13 @@ export async function deviceKey(placeId) {
 
 export const CONFIRM_NEEDED = 3; // so viele verschiedene Geräte machen einen neuen Ort "bestätigt"
 const HOURS = 3600 * 1000;
-export const STATUS_TTL = { glas: 24 * HOURS, papier: 24 * HOURS, altkleider: 48 * HOURS, toilette: 12 * HOURS, rastplatz: 12 * HOURS };
+export const STATUS_TTL = { glas: 24 * HOURS, papier: 24 * HOURS, altkleider: 48 * HOURS, toilette: 12 * HOURS, wickeln: 12 * HOURS, rastplatz: 12 * HOURS };
 
 export const STATUS_OPTIONS = {
   container: [['voll', 'Voll'], ['halb', 'Halb voll'], ['leer', 'Leer / Platz']],
   wc: [['sauber', 'Sauber'], ['ok', 'In Ordnung'], ['dreckig', 'Dreckig'], ['defekt', 'Defekt']],
 };
-export const statusGroup = (c) => (['glas', 'papier', 'altkleider'].includes(c) ? 'container' : ['toilette', 'rastplatz'].includes(c) ? 'wc' : null);
+export const statusGroup = (c) => (['glas', 'papier', 'altkleider'].includes(c) ? 'container' : ['toilette', 'wickeln', 'rastplatz'].includes(c) ? 'wc' : null);
 
 /** Meldungen in einem Kartenausschnitt laden. */
 export async function fetchBox(s, w, n, e) {

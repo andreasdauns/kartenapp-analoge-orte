@@ -227,6 +227,7 @@ function titleOf(it) {
     case 'apotheke': return t.name || 'Apotheke';
     case 'briefkasten': return 'Briefkasten';
     case 'toilette': return t.name && !/^(wc|toilette)$/i.test(t.name) ? t.name : 'Öffentliche Toilette';
+    case 'wickeln': return t.name && !/^(wc|toilette|wickel(raum|tisch|platz))$/i.test(t.name) ? t.name : (t.amenity === 'toilets' ? 'Wickeltisch in öffentlicher Toilette' : 'Wickelplatz');
     case 'rastplatz': return t.name || (t.highway === 'services' ? 'Raststätte' : 'Rastplatz');
     case 'parkride': case 'wanderpark':
       return t.name || { 'multi-storey': 'Parkhaus', underground: 'Tiefgarage', rooftop: 'Parkdeck' }[t.parking] || (it.c === 'parkride' && isCarpool(t) ? 'Mitfahrerparkplatz' : CATEGORY_BY_ID[it.c].label);
@@ -247,6 +248,18 @@ function titleOf(it) {
   }
 }
 
+// Wickelplätze: wo genau (laut Kartendaten)
+const WICKEL_LOC = { female_toilet: 'im Damen-WC', male_toilet: 'im Herren-WC', unisex_toilet: 'im Unisex-WC', wheelchair_toilet: 'im barrierefreien WC',
+  dedicated_room: 'eigener Wickelraum', room: 'eigener Wickelraum', sales_area: 'im Verkaufsraum', customer_area: 'im Kundenbereich', restaurant: 'im Gastraum', entrance: 'am Eingang' };
+const WICKEL_KIND = { toilets: 'Öffentliche Toilette', restaurant: 'Restaurant', cafe: 'Café', fast_food: 'Schnellrestaurant', pharmacy: 'Apotheke',
+  library: 'Bücherei', townhall: 'Rathaus', community_centre: 'Gemeindezentrum', place_of_worship: 'Kirche / Gemeindehaus', fuel: 'Tankstelle',
+  marketplace: 'Markt', bank: 'Bank', doctors: 'Arztpraxis', hospital: 'Krankenhaus', kindergarten: 'Kita', changing_table: null };
+function wickelWhere(t) {
+  const loc = (t['changing_table:location'] || '').split(';').map((x) => WICKEL_LOC[x.trim()]).filter(Boolean).join(', ');
+  const kind = t.shop ? 'im Geschäft' : WICKEL_KIND[t.amenity] ?? (t.tourism ? 'Tourismus / Museum' : t.leisure ? 'Freizeit' : null);
+  return [kind, loc].filter(Boolean).join(' · ');
+}
+
 function subOf(it) {
   const t = it.t;
   const parts = [];
@@ -256,6 +269,7 @@ function subOf(it) {
     parts.push((it.pv || []).map((p) => PROV[p]?.label).filter(Boolean).join(', '));
   }
   if (it.c === 'wertstoffhof') parts.push(t.operator);
+  if (it.c === 'wickeln') parts.push(wickelWhere(t));
   if (it.c === 'sammelstelle') parts.push([...new Set(recycleFlags(t).map((x) => FLAG_LABEL[x]).filter(Boolean))].slice(0, 4).join(', '));
   if (it.c === FUEL) {
     const title = titleOf(it).toLowerCase();
@@ -297,6 +311,10 @@ function statusOf(it, now = new Date()) {
       if (isContainer(it.c)) return s.open ? { cls: 'ok', text: s.always ? 'Einwurf jederzeit' : `Einwurf bis ${s.until}` } : { cls: 'bad', text: `Einwurfpause${s.next ? ' · ab ' + s.next : ''}` };
       return { cls: s.open ? 'ok' : 'bad', text: s.text };
     }
+  }
+  if (it.c === 'wickeln' && !t.opening_hours) {
+    if (t.access === 'customers' || t['changing_table:access'] === 'customers') return { cls: 'warn', text: 'nur für Kunden' };
+    if (t['changing_table:fee'] === 'yes' || (t.amenity === 'toilets' && t.fee === 'yes')) return { cls: '', text: 'kostenpflichtig' };
   }
   if (it.c === 'toilette') {
     if (t.access === 'permit') return { cls: 'warn', text: 'nur mit Erlaubnis' };
@@ -374,6 +392,14 @@ function factsRaw(it) {
     add('Barrierefrei', t.wheelchair ? `${jaNein(t.wheelchair)} (laut Kartendaten, bitte vorab prüfen)` : null);
     add('Wickeltisch', jaNein(t.changing_table));
     add('Zugang', t.access === 'customers' ? 'nur für Kunden' : null);
+  }
+  if (it.c === 'wickeln') {
+    add('Ort', wickelWhere(t) || null);
+    add('Öffnungszeiten', weekSummary(parseHours(t.opening_hours)) || t.opening_hours || 'unbekannt – vorher prüfen');
+    add('Gebühr', t['changing_table:fee'] === 'no' || (t.amenity === 'toilets' && t.fee === 'no') ? 'kostenlos' : t['changing_table:fee'] === 'yes' || (t.amenity === 'toilets' && t.fee === 'yes') ? (t.charge || 'ja') : null);
+    add('Zugang', t.access === 'customers' || t['changing_table:access'] === 'customers' ? 'nur für Kunden' : null);
+    add('Barrierefrei', (t['changing_table:wheelchair'] || t.wheelchair) ? `${jaNein(t['changing_table:wheelchair'] || t.wheelchair)} (laut Kartendaten, bitte vorab prüfen)` : null);
+    add('Hinweis', 'Wickelplatz laut OpenStreetMap, ohne Gewähr – bitte vor Ort prüfen');
   }
   if (it.c === 'rastplatz') {
     add('Art', t.highway === 'services' ? 'Raststätte' : 'Rastplatz / Parkplatz');
@@ -1153,7 +1179,7 @@ function markMini(placeId, q) {
   d[`${placeId}|${q}`] = Date.now();
   store.set('miniDone', d);
 }
-const EXISTS_Q = { glas: 'Steht der Container noch hier?', papier: 'Steht der Container noch hier?', altkleider: 'Steht der Container noch hier?', briefkasten: 'Hängt der Briefkasten noch hier?', toilette: 'Gibt es die Toilette noch?', geldautomat: 'Gibt es den Geldautomaten noch?', packstation: 'Steht die Paketstation noch hier?', sammelstelle: 'Gibt es die Sammelstelle noch?' };
+const EXISTS_Q = { glas: 'Steht der Container noch hier?', papier: 'Steht der Container noch hier?', altkleider: 'Steht der Container noch hier?', briefkasten: 'Hängt der Briefkasten noch hier?', toilette: 'Gibt es die Toilette noch?', wickeln: 'Gibt es den Wickelplatz noch?', geldautomat: 'Gibt es den Geldautomaten noch?', packstation: 'Steht die Paketstation noch hier?', sammelstelle: 'Gibt es die Sammelstelle noch?' };
 function miniQuestion(it) {
   if (!MITMACHEN || !R.enabled() || it.src === 'user' || it.adding) return null;
   const t = it.t || {}, r = repOf(it) || { confirm: new Set(), gone: new Set(), facts: {} };
@@ -1617,7 +1643,7 @@ $('#roundbar').addEventListener('click', (e) => {
 // ---------- „Hier fehlt was“: Wunsch für eine Stelle, nur als grobes Raster ----------
 const GAP_ITEMS = [['toilette', 'Öffentliche Toilette'], ['glas', 'Glascontainer'], ['papier', 'Papiercontainer'], ['altkleider', 'Altkleidercontainer'],
   ['briefkasten', 'Briefkasten'], ['geldautomat', 'Geldautomat'], ['packstation', 'Paketstation'], ['sammelstelle', 'Batterie-/Elektro-Sammelstelle'],
-  ['ladesaeule', 'Ladesäule'], ['aed', 'Defibrillator'], ['trinkwasser', 'Trinkbrunnen'], ['buecher', 'Bücherschrank'], ['wickeln', 'Wickeltisch'],
+  ['ladesaeule', 'Ladesäule'], ['aed', 'Defibrillator'], ['trinkwasser', 'Trinkbrunnen'], ['buecher', 'Bücherschrank'], ['wickeln', 'Wickelplatz'],
   ['sitzbank', 'Sitzbank'], ['fahrrad', 'Fahrrad-Reparatur'], ['anderes', 'Etwas anderes']];
 const GAP_LABEL = Object.fromEntries(GAP_ITEMS);
 const GAP_PER_DAY = 10; // auf dem Gerät: höchstens 10 Wünsche pro Tag

@@ -22,7 +22,7 @@ let total = 0, nearDup = 0;
 const norm = (v) => String(v || '').toLowerCase().replace(/[^a-z0-9äöüß]+/g, ' ').trim();
 const TIME_KEY = /hours|times|date|conditional/;
 // Diese Kategorien stehen oft wirklich mehrfach nebeneinander (Container-Reihe, Ladepunkte, Automaten)
-const MULTI_OK = new Set(['glas', 'papier', 'altkleider', 'sammelstelle', 'ladesaeule', 'geldautomat', 'briefkasten', 'packstation']);
+const MULTI_OK = new Set(['glas', 'papier', 'altkleider', 'sammelstelle', 'ladesaeule', 'geldautomat', 'briefkasten', 'packstation', 'wickeln']);
 
 for (const f of files) {
   const tile = JSON.parse(await readFile(new URL(`t/${f}`, dataDir), 'utf8'));

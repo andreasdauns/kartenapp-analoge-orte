@@ -184,6 +184,8 @@ async function run(kind, mobile) {
           if (new Set(names).size < names.length) bad(ctx, `${where}: gleicher Name mehrfach (${names.join(' / ')})`);
           if (/\bundefined\b|\bnull\b|\bNaN\b|\[object/.test(d.text)) bad(ctx, `${where}: enthält undefined/null/NaN`);
           if (d.dds.some((v) => !v)) bad(ctx, `${where}: leere Angabe`);
+          if (chip.id === 'wickeln' && !d.dts.includes('Hinweis')) bad(ctx, `${where}: Hinweis „ohne Gewähr“ fehlt`);
+          if (chip.id === 'wickeln' && !d.dts.includes('Öffnungszeiten')) bad(ctx, `${where}: Öffnungszeiten-Zeile fehlt`);
         }
         await page.locator('#close').click().catch(() => {});
         await page.waitForTimeout(300);
