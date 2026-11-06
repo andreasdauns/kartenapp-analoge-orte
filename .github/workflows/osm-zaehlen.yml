@@ -19,22 +19,27 @@ jobs:
         run: curl -sSfL --retry 3 -A "analoge-orte (github.com/andreasdauns/kartenapp-analoge-orte)" -o de.pbf https://download.geofabrik.de/europe/germany-latest.osm.pbf
       - name: Zählen
         run: |
-          osmium tags-filter de.pbf nwr/changing_table nwr/amenity=changing_table nwr/diaper 'nwr/changing_table:*' -o w.pbf --overwrite
+          osmium tags-filter de.pbf nwr/changing_table nwr/amenity=changing_table nwr/diaper nwr/toilets:changing_table -o w.pbf --overwrite
+          osmium export w.pbf -f geojsonseq -o w.geojsonseq --overwrite -x print_record_separator=false
+          tally() { jq -r "$1" w.geojsonseq | sort | uniq -c | sort -rn | head -${2:-25}; }
           {
             echo "## OSM-Zählung Wickelplätze Deutschland ($(date -u +%F))"
             echo '```'
-            echo "--- changing_table / diaper (Werte)"
-            osmium tags-count w.pbf changing_table diaper amenity=changing_table -s count-desc
-            echo "--- Objekte mit changing_table=yes oder limited: Art (amenity/shop/leisure/tourism)"
-            osmium tags-filter w.pbf nwr/changing_table=yes,limited nwr/amenity=changing_table nwr/diaper=yes -o y.pbf --overwrite
-            osmium tags-count y.pbf amenity shop leisure tourism highway building -s count-desc | head -40
-            echo "--- Zusatzangaben"
-            osmium tags-count y.pbf changing_table:location changing_table:fee changing_table:access changing_table:wheelchair toilets:wheelchair fee access wheelchair opening_hours -s count-desc | head -40
-            echo "--- Läden (shop) mit Wickelplatz, nach Marke/Betreiber"
-            osmium tags-filter y.pbf nwr/shop -o s.pbf --overwrite
-            osmium tags-count s.pbf brand -s count-desc | head -25
-            echo "--- Toiletten gesamt und davon mit changing_table"
-            osmium tags-filter de.pbf nwr/amenity=toilets -o t.pbf --overwrite
-            osmium tags-count t.pbf amenity=toilets changing_table -s count-desc
+            echo "--- Werte changing_table"; tally '.properties.changing_table // "-"'
+            echo "--- Werte toilets:changing_table"; tally '.properties["toilets:changing_table"] // empty'
+            echo "--- Wickelplätze (yes/limited/room/bench oder amenity=changing_table): Art"
+            SEL='select((.properties.changing_table // "" | test("^(yes|limited|room|bench)$")) or .properties.amenity=="changing_table" or (.properties["toilets:changing_table"] // "" | test("^(yes|limited|room|bench)$")))'
+            jq -r "$SEL | 1" w.geojsonseq | wc -l
+            jq -r "$SEL | (if .properties.shop then \"shop=\"+.properties.shop elif .properties.amenity then \"amenity=\"+.properties.amenity elif .properties.tourism then \"tourism=\"+.properties.tourism elif .properties.leisure then \"leisure=\"+.properties.leisure else \"sonst\" end)" w.geojsonseq | sort | uniq -c | sort -rn | head -40
+            echo "--- Marken (brand/name) bei Läden"
+            jq -r "$SEL | select(.properties.shop) | (.properties.brand // .properties.name // \"-\")" w.geojsonseq | sort | uniq -c | sort -rn | head -30
+            echo "--- changing_table:location"
+            jq -r "$SEL | .properties[\"changing_table:location\"] // empty" w.geojsonseq | tr ';' '\n' | sort | uniq -c | sort -rn | head -15
+            echo "--- access"
+            jq -r "$SEL | .properties.access // \"-\"" w.geojsonseq | sort | uniq -c | sort -rn | head -10
+            echo "--- mit opening_hours"
+            jq -r "$SEL | select(.properties.opening_hours) | 1" w.geojsonseq | wc -l
+            echo "--- je Bundesland grob nicht möglich; Beispiel Bad Neuenahr-Ahrweiler (Umkreis ~8 km)"
+            jq -r "$SEL | .geometry.coordinates | flatten | .[0:2] | @tsv" w.geojsonseq | awk '{x=$1;y=$2; if (x>7.0 && x<7.25 && y>50.48 && y<50.6) n++} END{print n+0}'
             echo '```'
           } | tee -a "$GITHUB_STEP_SUMMARY"
