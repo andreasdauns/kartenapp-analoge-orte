@@ -194,6 +194,11 @@ function endCard(t) {
   const p = prog(t, 8.1, 8.75); if (p <= 0) return; const e = E.inOut(p);
   circle(FOXM[0], FOXM[1], e * 2300); ctx.fillStyle = C.gr; ctx.fill();
   const hp = E.back(prog(t, 8.5, 9.0)); if (hp > 0) { circle(FOXE[0], FOXE[1] + 4, 270 * hp); ctx.fillStyle = 'rgba(255,255,255,.06)'; ctx.fill(); circle(FOXE[0], FOXE[1] + 4, 330 * hp); ctx.fillStyle = 'rgba(255,255,255,.035)'; ctx.fill(); }
+  // call to action
+  const cp = E.out(prog(t, 8.5, 9.0)); if (cp > 0) {
+    ctx.save(); ctx.globalAlpha = cp * .9; ctx.font = F(600, 58); ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+    ctx.fillStyle = C.wh; ctx.fillText('Jetzt im Browser testen:', 540, 962 + 30 * (1 - cp)); ctx.restore();
+  }
   // domain
   const dp = E.out(prog(t, 8.62, 9.12)); if (dp > 0) {
     ctx.save(); ctx.globalAlpha = dp; ctx.font = F(800, 132); ctx.textBaseline = 'alphabetic';
