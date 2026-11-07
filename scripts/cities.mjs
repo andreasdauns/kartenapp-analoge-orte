@@ -37,8 +37,10 @@ function pointOf(geom) {
 export function hoursDE(s) {
   if (!s) return undefined;
   let v = String(s).trim();
-  if (/^(durchgehend|ganzt[äa]gig|24 ?(std|h|stunden)|rund um die uhr|24\/7)/i.test(v)) return '24/7';
-  v = v.replace(/\b(t[äa]glich|jeden tag)\b:?\s*/gi, 'Mo-Su ');
+  if (/^(durchgehend|ganzt[äa]gig|24 ?(std|h|stunden)|rund um die uhr|24\/7)/i.test(v)
+    || (/^(t[äa]glich|jeden tag)\b/i.test(v) && /24 ?(std|h|stunden)|rund um die uhr/i.test(v))) return '24/7';
+  // „täglich 8–22 Uhr“ → „Mo-Su 08:00-22:00“; „täglich außer …“ bleibt Klartext
+  v = v.replace(/\b(t[äa]glich|jeden tag):?\s*(?=\d)/gi, 'Mo-Su ');
   v = v.replace(/\r?\n|<br\s*\/?>/gi, '; ').replace(/\s*Uhr/gi, '').replace(/[–—]/g, '-').replace(/(\d{1,2})\.(\d{2})/g, '$1:$2')
     .replace(/\bMo(ntag)?\b/g, 'Mo').replace(/\bDi(enstag)?\b/g, 'Tu').replace(/\bMi(ttwoch)?\b/g, 'We').replace(/\bDo(nnerstag)?\b/g, 'Th')
     .replace(/\bFr(eitag)?\b/g, 'Fr').replace(/\bSa(mstag)?\b/g, 'Sa').replace(/\bSo(nntag)?\b/g, 'Su')

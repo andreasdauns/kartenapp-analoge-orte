@@ -2,16 +2,32 @@ name: KI-Prüfer (Code-Review)
 
 # Prüft jede Änderung an main mit Claude (Anthropic-API) auf Fehler, Sicherheit,
 # Datenschutz und Rechtsrisiken. Ergebnis steht in der Zusammenfassung des Laufs;
-# bei kritischen Funden wird ein GitHub-Issue angelegt. Blockiert das Veröffentlichen nicht.
-# Braucht das Repository-Secret ANTHROPIC_API_KEY (legt Andreas selbst an). Ohne Secret wird übersprungen.
+# bei kritischen Funden wird ein GitHub-Issue angelegt bzw. ergänzt. Blockiert das Veröffentlichen nicht.
+# Manuell („Run workflow“) auch als Komplettprüfung des ganzen Quelltexts, wahlweise mit Opus.
+# Braucht das Repository-Secret ANTHROPIC_API_KEY (Arbeitsbereich „nahfuchs-ki-pruefer“, Limit 20 $/Monat).
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - 'data/**'
+      - 'marketing/**'
+      - 'icons/**'
+      - 'sources/**'
   workflow_dispatch:
     inputs:
+      mode:
+        description: 'diff = letzte Änderungen, full = kompletter Quelltext'
+        type: choice
+        options: [diff, full]
+        default: diff
+      model:
+        description: 'sonnet (Standard, günstig) oder opus (gründlicher, doppelter Preis)'
+        type: choice
+        options: [sonnet, opus]
+        default: sonnet
       commits:
-        description: 'Wie viele der letzten Commits prüfen?'
+        description: 'Nur bei diff: wie viele der letzten Commits prüfen?'
         default: '1'
 
 permissions:
@@ -25,19 +41,22 @@ concurrency:
 jobs:
   review:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 50
+          persist-credentials: false
       - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
         with:
           node-version: 22
-      - name: Änderungen prüfen
+      - name: Code prüfen
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GH_TOKEN: ${{ github.token }}
           BEFORE: ${{ github.event.before }}
           AFTER: ${{ github.sha }}
-          COMMITS: ${{ inputs.commits }}
+          MODE: ${{ inputs.mode || 'diff' }}
+          KI_MODEL: ${{ inputs.model || 'sonnet' }}
+          COMMITS: ${{ inputs.commits || '1' }}
         run: node scripts/ki-pruefer.mjs
