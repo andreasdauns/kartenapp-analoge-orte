@@ -17,7 +17,11 @@ const MODELS = { sonnet: 'claude-sonnet-5-5', opus: 'claude-opus-5-5', haiku: 'c
 const MODEL = MODELS[(process.env.KI_MODEL || 'sonnet').toLowerCase()] || MODELS.sonnet;
 const MAX_DIFF = 120_000;       // Zeichen pro Push-Prüfung (~30.000 Tokens)
 const MAX_FULL = 600_000;       // Zeichen für die Komplettprüfung insgesamt (~150.000 Tokens)
-const MAX_OUT = 8000;           // Antwort-Tokens pro Anfrage
+// Sonnet 5.5 denkt standardmäßig vor der Antwort („adaptive thinking“); Denk-Tokens zählen in max_tokens
+// und kosten wie Ausgabe-Tokens. Push-Prüfung: kaum Denken, günstig. Komplettprüfung: gründlich.
+const ASK = MODE === 'full'
+  ? { max_tokens: 32000, thinking: { type: 'adaptive' }, output_config: { effort: 'high' } }
+  : { max_tokens: 6000, thinking: { type: 'between_tools' }, output_config: { effort: 'medium' } };
 
 const summary = (s) => { if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, s + '\n'); console.log(s); };
 const git = (...a) => execFileSync('git', a, { encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
@@ -41,7 +45,7 @@ async function ask(user) {
     res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: { 'x-api-key': KEY, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-      body: JSON.stringify({ model: MODEL, max_tokens: MAX_OUT, system: SYSTEM, messages: [{ role: 'user', content: user }] }),
+      body: JSON.stringify({ model: MODEL, ...ASK, system: SYSTEM, messages: [{ role: 'user', content: user }] }),
       signal: AbortSignal.timeout(600_000),
     });
   } catch (e) {
@@ -50,6 +54,7 @@ async function ask(user) {
   if (!res.ok) throw new Error(`API-Fehler ${res.status}: ${(await res.text()).slice(0, 300)}`);
   const j = await res.json();
   const text = (j.content || []).filter((b) => b.type === 'text').map((b) => b.text).join('\n').trim();
+  if (!text) throw new Error(`Leere Antwort (stop_reason: ${j.stop_reason}) – Denk-Budget aufgebraucht?`);
   const verdict = (text.match(/ERGEBNIS:\s*(OK|HINWEISE|KRITISCH)/) || [])[1] || 'HINWEISE';
   return { text, verdict, usage: j.usage || {}, cut: j.stop_reason === 'max_tokens' };
 }
@@ -86,7 +91,7 @@ try {
       ['App: Hauptlogik', (f) => f === 'src/app.js' || f === 'src/config.js'],
       ['App: Module, Oberfläche, Rechtstexte', (f) => (f.startsWith('src/') && f !== 'src/app.js' && f !== 'src/config.js') || /^(index|info)\.html$|^impressum\/|^sw\.js$|^styles\.css$|^manifest\.webmanifest$/.test(f)],
       ['Datenaufbereitung und Quellen', (f) => f.startsWith('scripts/') && f !== 'scripts/ui-check.mjs'],
-      ['Datenbank, Automatisierung, Android, Tests', (f) => f.startsWith('supabase/') || f.startsWith('.github/') || f.startsWith('android/') || f === 'scripts/ui-check.mjs' || f === 'config.json' || f === 'README.md'],
+      ['Datenbank, Automatisierung, Android, Tests', (f) => f.startsWith('supabase/') || f.startsWith('.github/') || f.startsWith('android/') || f === 'scripts/ui-check.mjs' || f === 'config.json' || f === 'README.md' || /^(\.well-known\/|robots\.txt$|sitemap\.xml$|\.gitignore$)/.test(f)],
     ];
     const used = new Set();
     let total = 0;
