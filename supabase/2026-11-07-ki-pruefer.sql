@@ -2,7 +2,7 @@
 -- Einmal komplett in Supabase unter "SQL Editor" einfügen und auf "Run" klicken.
 -- Bewirkt:
 --  1. Ablaufdatum von Meldungen wird serverseitig begrenzt: Zustandsmeldungen höchstens 3 Tage
---     (in der App 12–48 Stunden), alle anderen Meldungsarten ohne Ablaufdatum. Ein manipulierter
+--     (in der App 12–48 Stunden), „vorübergehend geschlossen“ höchstens 8 Tage (App: 7). Ein manipulierter
 --     Client kann damit keine „voll/geschlossen“-Meldung mehr monatelang aktuell halten.
 --  2. Index auf created_at: Die Spam-Zählung „Meldungen der letzten Stunde“ liest nicht mehr die ganze Tabelle.
 
@@ -10,11 +10,10 @@
 create or replace function public.reports_expiry_cap() returns trigger
 language plpgsql security definer set search_path = public as $$
 begin
-  if new.kind = 'status' then
-    new.expires_at := least(coalesce(new.expires_at, now() + interval '24 hours'), now() + interval '3 days');
+  -- Nur begrenzen, nie neu setzen: Zustand höchstens 3 Tage (App: 12–48 h), „vorübergehend geschlossen“ höchstens 8 Tage (App: 7 Tage)
+  if new.expires_at is not null then
+    new.expires_at := least(new.expires_at, now() + case when new.kind = 'closed' then interval '8 days' else interval '3 days' end);
     if new.expires_at < now() then new.expires_at := now() + interval '1 hour'; end if;
-  else
-    new.expires_at := null;
   end if;
   return new;
 end;
