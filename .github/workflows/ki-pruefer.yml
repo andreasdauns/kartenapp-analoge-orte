@@ -1,0 +1,43 @@
+name: KI-Prüfer (Code-Review)
+
+# Prüft jede Änderung an main mit Claude (Anthropic-API) auf Fehler, Sicherheit,
+# Datenschutz und Rechtsrisiken. Ergebnis steht in der Zusammenfassung des Laufs;
+# bei kritischen Funden wird ein GitHub-Issue angelegt. Blockiert das Veröffentlichen nicht.
+# Braucht das Repository-Secret ANTHROPIC_API_KEY (legt Andreas selbst an). Ohne Secret wird übersprungen.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      commits:
+        description: 'Wie viele der letzten Commits prüfen?'
+        default: '1'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: ki-pruefer
+  cancel-in-progress: false
+
+jobs:
+  review:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 50
+      - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+        with:
+          node-version: 22
+      - name: Änderungen prüfen
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GH_TOKEN: ${{ github.token }}
+          BEFORE: ${{ github.event.before }}
+          AFTER: ${{ github.sha }}
+          COMMITS: ${{ inputs.commits }}
+        run: node scripts/ki-pruefer.mjs
