@@ -1,0 +1,42 @@
+Nahfuchs zeigt dir auf einer Karte, wo die kleinen Dinge des Alltags in deiner Nähe sind – und hilft dabei, diese Informationen gemeinsam aktuell zu halten.
+
+WICHTIGER HINWEIS
+Nahfuchs ist ein privates Angebot. Die App steht in keiner Verbindung zu einer Behörde, Stadt, Gemeinde oder anderen staatlichen Stelle, vertritt keine staatliche Stelle und bietet keine Verwaltungsleistungen an. Verbindlich sind immer die Angaben der jeweiligen Stelle. Die amtlichen Originalquellen findest du unten unter QUELLEN.
+
+Wo ist der nächste Briefkasten, und wann wird er geleert? Wo steht ein Glascontainer? Gibt es hier eine öffentliche Toilette oder einen Wickelplatz? Nahfuchs macht öffentliche Alltagsinfrastruktur sichtbar.
+
+WAS DU FINDEST
+• Briefkästen mit Leerungszeiten
+• Postfilialen, Paketshops und Paketstationen (alle Anbieter)
+• Glas-, Papier- und Altkleidercontainer, Wertstoffhöfe und Sammelstellen (z. B. Batterien, Elektro-Kleingeräte)
+• Öffentliche Toiletten – u. a. mit Hinweisen zu Barrierefreiheit laut Kartendaten und Euroschlüssel
+• Wickelplätze
+• Raststätten und Rastplätze, Park & Ride, Wanderparkplätze
+• Tankstellen mit Filter nach Tankkarten (ohne Gewähr)
+• Geldautomaten
+• Apotheken mit Link zur offiziellen Notdienstsuche der Apothekerkammern
+• Ladesäulen
+
+WOHIN DAMIT?
+Wähle, was du loswerden willst (z. B. Batterien, Elektro-Kleingeräte, Schuhe), und sieh passende Sammelstellen sowie eine allgemeine Regel mit Quellenangabe. Verbindlich ist die Abfallsatzung deiner Kommune.
+
+GEMEINSAM AKTUELL HALTEN
+Stimmt etwas nicht? Melde es per Knopfdruck – ganz ohne Konto: voll, verschmutzt, gibt es nicht mehr, neuer Ort. Meldungen sind auch für andere Nutzer sichtbar. Es gibt keine Kommentare und keinen Chat. Deine Meldungen kannst du in der App auf der Info-Seite über „Meine Meldungen löschen“ selbst entfernen.
+
+HINKOMMEN
+Mit einem Tipp startest du die Route in Google Maps, Apple Karten oder Waze.
+
+KOSTENLOS UND OHNE SCHNICKSCHNACK
+• kostenlos • ohne Werbung • ohne Tracking • ohne Anmeldung
+
+QUELLEN
+• Kartendaten: OpenStreetMap-Mitwirkende (ODbL) – https://www.openstreetmap.org/copyright
+• Ladesäulen: Bundesnetzagentur, Ladesäulenregister (CC BY 4.0) – https://www.bundesnetzagentur.de/ladesaeulenregister
+• Autobahn-Rastanlagen: Die Autobahn GmbH des Bundes – https://verkehr.autobahn.de
+• Container, Toiletten und Briefkästen einzelner Städte und Kreise: offene Daten der jeweiligen Kommune – vollständige Liste mit Links: https://nahfuchs.de/info.html#quellen
+• Entsorgungshinweise: Umweltbundesamt – https://www.umweltbundesamt.de – und Gesetzestexte auf https://www.gesetze-im-internet.de
+• Apotheken-Notdienst: Notdienstsuche der Apothekerkammern – https://www.aponet.de/notdienstsuche
+
+Alle Angaben ohne Gewähr – Leerungszeiten, Ausstattung und Standorte können sich ändern. Bitte prüfe die Informationen vor Ort.
+
+Mehr Infos, Datenschutz und Impressum: https://nahfuchs.de
