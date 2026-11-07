@@ -66,7 +66,7 @@ async function run(kind, mobile) {
     const page = await context.newPage();
     let noGL = false;
     page.on('pageerror', (e) => { if (/initialize WebGL|webglcontextcreationerror/.test(e.message)) noGL = true; else bad(ctx, `JavaScript-Fehler: ${e.message}`); });
-    await page.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('welcomed', '1'); localStorage.setItem('supportHidden', '1'); } catch { /* */ } });
+    await page.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('welcomed', '1'); localStorage.setItem('gapTip', 'true'); localStorage.setItem('supportHidden', '1'); } catch { /* */ } });
     await page.goto(BASE, { waitUntil: 'domcontentloaded' });
 
     // Start: Quellenbox darf nie aufgeklappt erscheinen, Kurzangabe muss sichtbar sein
@@ -301,7 +301,7 @@ async function roundCheck() {
     const context = await browser.newContext({ viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true, geolocation: { latitude: PLACES[0].lat, longitude: PLACES[0].lon }, permissions: ['geolocation'], locale: 'de-DE', timezoneId: 'Europe/Berlin' });
     await context.route(/openfreemap\.org/, (r) => (r.request().url().includes('/styles/') ? r.fulfill({ contentType: 'application/json', body: BLANK_STYLE }) : r.abort()));
     await context.route(/supabase\.co/, (r) => r.fulfill({ contentType: 'application/json', body: '[]' }));
-    await context.addInitScript((z) => { try { localStorage.clear(); localStorage.setItem('welcomed', '1'); localStorage.setItem('supportHidden', '1'); } catch { /* */ } document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.zoom = String(z); }); }, zoom);
+    await context.addInitScript((z) => { try { localStorage.clear(); localStorage.setItem('welcomed', '1'); localStorage.setItem('gapTip', 'true'); localStorage.setItem('supportHidden', '1'); } catch { /* */ } document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.zoom = String(z); }); }, zoom);
     const page = await context.newPage();
     page.on('pageerror', (e) => { if (!/WebGL/.test(e.message)) bad(ctx, `JavaScript-Fehler: ${e.message}`); });
     await page.clock.setFixedTime(new Date('2026-11-04T10:30:00+01:00')); // Mittwochvormittag: Container und Geschäfte offen
@@ -385,7 +385,7 @@ async function shortcutCheck() {
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, geolocation: { latitude: PLACES[0].lat, longitude: PLACES[0].lon }, permissions: ['geolocation'], locale: 'de-DE' });
     await context.route(/openfreemap\.org/, (r) => (r.request().url().includes('/styles/') ? r.fulfill({ contentType: 'application/json', body: BLANK_STYLE }) : r.abort()));
     await context.route(/supabase\.co/, (r) => r.fulfill({ contentType: 'application/json', body: '[]' }));
-    await context.addInitScript(() => { try { if (!sessionStorage.getItem('x')) { localStorage.clear(); localStorage.setItem('welcomed', '1'); localStorage.setItem('supportHidden', '1'); localStorage.setItem('cats', JSON.stringify(['geldautomat'])); sessionStorage.setItem('x', '1'); } } catch { /* */ } });
+    await context.addInitScript(() => { try { if (!sessionStorage.getItem('x')) { localStorage.clear(); localStorage.setItem('welcomed', '1'); localStorage.setItem('gapTip', 'true'); localStorage.setItem('supportHidden', '1'); localStorage.setItem('cats', JSON.stringify(['geldautomat'])); sessionStorage.setItem('x', '1'); } } catch { /* */ } });
     const page = await context.newPage();
     page.on('pageerror', (e) => { if (!/WebGL/.test(e.message)) bad(ctx, `JavaScript-Fehler: ${e.message}`); });
     await page.goto(BASE + '?k=' + k);
@@ -417,7 +417,7 @@ async function wohinCheck() {
     const context = await browser.newContext({ viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true, geolocation: { latitude: PLACES[0].lat, longitude: PLACES[0].lon }, permissions: ['geolocation'], locale: 'de-DE' });
     await context.route(/openfreemap\.org/, (r) => (r.request().url().includes('/styles/') ? r.fulfill({ contentType: 'application/json', body: BLANK_STYLE }) : r.abort()));
     await context.route(/supabase\.co/, (r) => r.fulfill({ contentType: 'application/json', body: '[]' }));
-    await context.addInitScript((z) => { try { localStorage.clear(); localStorage.setItem('welcomed', '1'); localStorage.setItem('supportHidden', '1'); } catch { /* */ } document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.zoom = String(z); }); }, zoom);
+    await context.addInitScript((z) => { try { localStorage.clear(); localStorage.setItem('welcomed', '1'); localStorage.setItem('gapTip', 'true'); localStorage.setItem('supportHidden', '1'); } catch { /* */ } document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.zoom = String(z); }); }, zoom);
     const page = await context.newPage();
     page.on('pageerror', (e) => { if (!/WebGL/.test(e.message)) bad(ctx, `JavaScript-Fehler: ${e.message}`); });
     await page.goto(BASE);
@@ -491,7 +491,7 @@ async function mitmachCheck() {
       if (q.method() === 'POST' && /\/rest\/v1\/(gaps|reports)$/.test(new URL(q.url()).pathname)) { sent.push({ path: new URL(q.url()).pathname, body: q.postDataJSON() }); return r.fulfill({ status: 201, body: '' }); }
       return r.fulfill({ contentType: 'application/json', body: '[]' });
     });
-    await context.addInitScript((z) => { try { localStorage.clear(); localStorage.setItem('welcomed', '1'); localStorage.setItem('supportHidden', '1'); } catch { /* */ } document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.zoom = String(z); }); }, zoom);
+    await context.addInitScript((z) => { try { localStorage.clear(); localStorage.setItem('welcomed', '1'); localStorage.setItem('gapTip', 'true'); localStorage.setItem('supportHidden', '1'); } catch { /* */ } document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.zoom = String(z); }); }, zoom);
     const page = await context.newPage();
     page.on('pageerror', (e) => { if (!/WebGL/.test(e.message)) bad(ctx, `JavaScript-Fehler: ${e.message}`); });
     await page.goto(BASE);
@@ -623,7 +623,7 @@ async function addCheck() {
     const context = await browser.newContext({ viewport: { width: 360, height: 640 }, isMobile: true, hasTouch: true, geolocation: { latitude: 50.5446, longitude: 7.1136 }, permissions: ['geolocation'] });
     await context.route(/openfreemap\.org/, (r) => r.fulfill({ contentType: 'application/json', body: BLANK_STYLE }));
     await context.route(/supabase\.co/, (r) => r.fulfill({ contentType: 'application/json', body: '[]' }));
-    await context.addInitScript((z) => { try { localStorage.setItem('welcomed', '1'); } catch { /* */ } document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.zoom = String(z); }); }, zoom);
+    await context.addInitScript((z) => { try { localStorage.setItem('welcomed', '1'); localStorage.setItem('gapTip', 'true'); } catch { /* */ } document.addEventListener('DOMContentLoaded', () => { document.documentElement.style.zoom = String(z); }); }, zoom);
     const page = await context.newPage();
     await page.goto(BASE);
     await page.waitForTimeout(2000);
