@@ -169,7 +169,7 @@ body.dragging .fabs, body.dragging .maplibregl-ctrl-bottom-left { transition: no
 .crosshair::before { left: 21px; top: 0; width: 2px; height: 44px; }
 .crosshair::after { top: 21px; left: 0; height: 2px; width: 44px; }
 .crosshair[hidden] { display: none; }
-.toast { position: fixed; left: 50%; top: calc(var(--safe-top) + 130px); transform: translateX(-50%); z-index: 30; background: var(--accent); color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 14px; font-weight: 600; box-shadow: var(--shadow); max-width: calc(100% - 32px); }
+.toast { position: fixed; left: 50%; top: calc(var(--safe-top) + 130px); transform: translateX(-50%); z-index: 30; background: var(--accent); color: #fff; padding: 10px 16px; border-radius: 12px; font-size: 14px; font-weight: 600; box-shadow: var(--shadow); max-width: calc(100% - 32px); pointer-events: none; } /* reine Info: Tipps darunter bleiben bedienbar */
 .toast[hidden] { display: none; }
 .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; }
 .opts .btn { flex: none; min-height: 46px; height: auto; padding: 8px 10px; font-size: 14px; white-space: normal; line-height: 1.2; text-align: center; }
