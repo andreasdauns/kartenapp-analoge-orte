@@ -38,6 +38,7 @@ export function hoursDE(s) {
   if (!s) return undefined;
   let v = String(s).trim();
   if (/^(durchgehend|ganzt[äa]gig|24 ?(std|h|stunden)|rund um die uhr|24\/7)/i.test(v)) return '24/7';
+  v = v.replace(/\b(t[äa]glich|jeden tag)\b:?\s*/gi, 'Mo-Su ');
   v = v.replace(/\r?\n|<br\s*\/?>/gi, '; ').replace(/\s*Uhr/gi, '').replace(/[–—]/g, '-').replace(/(\d{1,2})\.(\d{2})/g, '$1:$2')
     .replace(/\bMo(ntag)?\b/g, 'Mo').replace(/\bDi(enstag)?\b/g, 'Tu').replace(/\bMi(ttwoch)?\b/g, 'We').replace(/\bDo(nnerstag)?\b/g, 'Th')
     .replace(/\bFr(eitag)?\b/g, 'Fr').replace(/\bSa(mstag)?\b/g, 'Sa').replace(/\bSo(nntag)?\b/g, 'Su')
@@ -256,6 +257,24 @@ export const CITY_SOURCES = {
       return { features: feats };
     },
     map: (p) => ({ c: 'toilette', t: toilet({ name: p.name || p.bezeichnung || p.NAME || p.standort, opening_hours: hoursDE(p.oeffnungszeiten || p.OEFFNUNGSZEITEN), description: p._nette ? 'Nette Toilette (in Gastronomie/Geschäft)' : (p.beschreibung || undefined) }) }),
+  },
+  // Stadt Bielefeld: Lizenz CC BY 4.0 laut geoKATALOG und Mail opendata@bielefeld.de vom 6.11.2026.
+  // Achtung: Die Container-Daten der Stadt sind NUR intern nutzbar – nicht einbinden.
+  bielefeld: {
+    name: 'Stadt Bielefeld', license: 'CC BY 4.0', url: 'https://bielefeld01.de/md/',
+    fetch: async () => {
+      const feats = [];
+      for (const type of ['ms:toiletten_p', 'ms:toiletten_nette_p']) {
+        const d = await get(`https://bielefeld01.de/md/WFS/offentliche_toiletten/01?service=WFS&version=2.0.0&request=GetFeature&typeNames=${type}&outputFormat=${encodeURIComponent('application/json; subtype=geojson')}&srsName=EPSG:4326`).catch(() => ({ features: [] }));
+        for (const f of d.features || []) feats.push({ ...f, properties: { ...f.properties, _nette: type.includes('nette') } });
+      }
+      return { features: feats };
+    },
+    map: (p) => {
+      if (p._nette) return { c: 'toilette', t: toilet({ name: p.name, 'addr:street': p.adresse, wheelchair: yes(p.behind), changing_table: yes(p.wickeltisc), fee: 'no', description: 'Nette Toilette: Gästetoilette in Gastronomie/Geschäft, während der Öffnungszeiten ohne Verzehrzwang' }) };
+      if (/nur bei/i.test(p.oeff || '')) return null; // z. B. Friedhof nur bei Bestattungen
+      return { c: 'toilette', t: toilet({ name: p.einricht, 'addr:street': p.str, opening_hours: hoursDE(p.oeff), wheelchair: yes(p.barfrei), fee: yes(p.entgelt), description: [p.anmerkun, 'Angaben der Stadt, Stand 2016 – bitte vor Ort prüfen'].filter(Boolean).join(' · ') }) };
+    },
   },
   muenster_wc: {
     name: 'Stadt Münster', license: 'dl-de/by-2.0', url: 'https://opendata.stadt-muenster.de',
