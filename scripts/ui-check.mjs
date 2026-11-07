@@ -380,7 +380,7 @@ async function shortcutCheck() {
   if (sc.length !== 4) bad('Kurzbefehle', `${sc.length} statt 4 Kurzbefehle im Manifest`);
   for (const s of sc) for (const ic of s.icons || []) { try { await readFile(new URL('../' + ic.src, import.meta.url)); } catch { bad('Kurzbefehle', `Symbol fehlt: ${ic.src}`); } }
   const browser = await chromium.launch();
-  for (const [k, expect] of [['toilette', 'detail'], ['briefkasten', 'detail'], ['runde', 'round'], ['zuletzt', 'none']]) {
+  for (const [k, expect] of [['toilette', 'detail'], ['briefkasten', 'detail'], ['runde', 'round'], ['zuletzt', 'none'], ['__proto__', 'none'], ['constructor', 'none']]) { // die letzten beiden: kaputte Startlinks dürfen nichts verstellen
     const ctx = `Kurzbefehl ${k}`;
     const context = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true, geolocation: { latitude: PLACES[0].lat, longitude: PLACES[0].lon }, permissions: ['geolocation'], locale: 'de-DE' });
     await context.route(/openfreemap\.org/, (r) => (r.request().url().includes('/styles/') ? r.fulfill({ contentType: 'application/json', body: BLANK_STYLE }) : r.abort()));
@@ -601,6 +601,9 @@ async function twaCheck() {
   await page.goto(BASE + '?src=twa&unterstuetzen=1');
   await page.waitForTimeout(1500);
   if (await page.locator('a[href*="ko-fi"]:visible').count()) bad('Android-App', 'Ko-fi-Link in der App sichtbar');
+  // Links zur Info-Seite (öffnen ggf. neuen Tab mit eigener Sitzung) müssen das App-Merkmal mitnehmen
+  const href = await page.evaluate(() => { const a = document.createElement('a'); a.href = 'info.html#nutzung'; a.textContent = 'x'; document.body.append(a); a.addEventListener('click', (e) => e.preventDefault()); a.click(); return a.href; });
+  if (!/[?&]src=twa/.test(href)) bad('Android-App', `Link zur Info-Seite ohne App-Merkmal: ${href}`);
   await page.goto(BASE + 'info.html#unterstuetzen');
   await page.waitForTimeout(800);
   if (await page.locator('a[href*="ko-fi"]:visible').count()) bad('Android-App', 'Ko-fi-Link auf der Info-Seite sichtbar');

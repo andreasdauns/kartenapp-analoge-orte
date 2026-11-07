@@ -1,7 +1,7 @@
 // Service Worker: App offline startfähig, Daten immer zuerst frisch aus dem Netz.
-const VERSION = 'v61';
+const VERSION = 'v62';
 const SHELL = [
-  './', 'index.html', 'styles.css', 'manifest.webmanifest',
+  './', 'index.html', 'info.html', 'styles.css', 'manifest.webmanifest', // info.html: Impressum/Datenschutz auch offline
   'src/app.js', 'src/categories.js', 'src/hours.js', 'src/reports.js', 'src/config.js', 'src/round.js', 'src/wohin.js',
   'vendor/maplibre-gl.js', 'vendor/maplibre-gl.css', 'icons/icon.svg',
 ];
@@ -19,8 +19,8 @@ self.addEventListener('fetch', (e) => {
   e.respondWith(
     fetch(e.request)
       .then((res) => {
-        const copy = res.clone();
-        if (res.ok) caches.open(VERSION).then((c) => c.put(e.request, copy));
+        // Nur fertige, vollständige Antworten speichern; waitUntil hält den Worker bis zum Schreiben wach
+        if (res.ok && res.status === 200) { const copy = res.clone(); e.waitUntil(caches.open(VERSION).then((c) => c.put(e.request, copy)).catch(() => {})); }
         return res;
       })
       .catch(() => caches.match(e.request, { ignoreSearch: e.request.mode === 'navigate' })) // z. B. Start der Android-App mit ?src=twa

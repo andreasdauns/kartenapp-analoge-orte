@@ -37,13 +37,14 @@ function pointOf(geom) {
 export function hoursDE(s) {
   if (!s) return undefined;
   let v = String(s).trim();
-  if (/^(durchgehend|ganzt[äa]gig|24 ?(std|h|stunden)|rund um die uhr|24\/7)/i.test(v)
-    || (/^(t[äa]glich|jeden tag)\b/i.test(v) && /24 ?(std|h|stunden)|rund um die uhr/i.test(v))) return '24/7';
+  const limited = /au(ß|ss)er|\bnur\b|\bnicht\b|geschlossen|\bbis\b|ausgenommen/i.test(v);
+  if (!limited && /^(durchgehend|ganzt[äa]gig|24 ?(std|h|stunden)|rund um die uhr|24\/7)/i.test(v)
+    || (!limited && /^(t[äa]glich|jeden tag)\b/i.test(v) && /24 ?(std|h|stunden)|rund um die uhr/i.test(v))) return '24/7';
   // „täglich 8–22 Uhr“ → „Mo-Su 08:00-22:00“; „täglich außer …“ bleibt Klartext
-  v = v.replace(/\b(t[äa]glich|jeden tag):?\s*(?=\d)/gi, 'Mo-Su ');
+  if (!limited) v = v.replace(/\b(t[äa]glich|jeden tag):?\s*(?=\d)/gi, 'Mo-Su ');
   v = v.replace(/\r?\n|<br\s*\/?>/gi, '; ').replace(/\s*Uhr/gi, '').replace(/[–—]/g, '-').replace(/(\d{1,2})\.(\d{2})/g, '$1:$2')
     .replace(/\bMo(ntag)?\b/g, 'Mo').replace(/\bDi(enstag)?\b/g, 'Tu').replace(/\bMi(ttwoch)?\b/g, 'We').replace(/\bDo(nnerstag)?\b/g, 'Th')
-    .replace(/\bFr(eitag)?\b/g, 'Fr').replace(/\bSa(mstag)?\b/g, 'Sa').replace(/\bSo(nntag)?\b/g, 'Su')
+    .replace(/\bFr(eitag)?\b/g, 'Fr').replace(/\bSa(mstag)?\b/g, 'Sa').replace(/\bSonntag\b|\bSo\b(?=[\s:,.;-]*(\d|$|[A-Z][a-z]\b|-))/g, 'Su')
     .replace(/(\b[A-Z][a-z]):(\s)/g, '$1$2').replace(/\s*;\s*/g, '; ').replace(/(\d)\s*-\s*(\d)/g, '$1-$2');
   v = v.replace(/\b(\d):/g, '0$1:');
   return v;
@@ -94,17 +95,31 @@ async function csvFeatures(url) {
   };
 }
 const txtOf = (p) => Object.values(p).filter((v) => typeof v === 'string').join(' ');
+// Fraktion (Glas/Papier/Kleider) erkennen, ohne auf Straßennamen hereinzufallen („Pappelweg“, „Glasstraße“):
+// In Adress-/Namensfeldern zählen nur eindeutige Container-Wörter, in den übrigen Feldern auch kurze Begriffe.
+const ADDR_KEY = /str(asse|aße|\b)|adress|standort|^ort|ort_?nam|name|bezeichnung|lage|plz|stadtteil|gemeinde/i;
+const STRICT = { glas: /altglas|glascontainer|glas-?container|drei-?kammer/i, papier: /altpapier|papiercontainer|papier-?container/i, altkleider: /altkleid|kleidercontainer|textilcontainer|alttextil/i };
+const LOOSE = { glas: /\bglas\b|altglas|drei-?kammer|wei(ß|ss)glas|braunglas|grünglas/i, papier: /papier|\bpappe\b|kartonage/i, altkleider: /altkleid|textil|kleider|\bschuhe?\b/i };
+export function fractionsOf(p) {
+  const found = new Set();
+  for (const [k, v] of Object.entries(p)) {
+    if (typeof v !== 'string' || !v) continue;
+    const rules = ADDR_KEY.test(k) ? STRICT : LOOSE;
+    for (const [c, re] of Object.entries(rules)) if (re.test(v)) found.add(c);
+  }
+  return found;
+}
 // Container-Arten aus beliebigen Feldern erkennen
 function containersFrom(p, operator, fallback = null) {
   const out = [];
   const flag = (re) => Object.entries(p).some(([k, v]) => re.test(k) && (v === true || Number(v) > 0 || /^(ja|x|yes|1|true)$/i.test(String(v))));
-  const t = txtOf(p);
+  const fr = fractionsOf(p);
   const desc = p.standort || p.Standort || p.strasse || p.Strasse || p.STANDORT || p.BEZEICHNUNG || p.bezeichnung || p.adresse || p.Adresse || p.LAGEBESCHREIBUNG || undefined;
   const hours = hoursDE(p.einwurfzeiten || p.Einwurfzeiten || p.oeffnungszeiten);
   const add = (c) => out.push({ c, t: container(c, { operator, description: desc, opening_hours: hours }) });
-  if (flag(/glas/i) || /glas|drei-kammer|weiß|weiss.*braun/i.test(t)) add('glas');
-  if (flag(/papier|pappe/i) || /papier|pappe/i.test(t)) add('papier');
-  if (flag(/kleid|textil|schuh/i) || /altkleid|textil|kleider/i.test(t)) add('altkleider');
+  if (flag(/glas/i) || fr.has('glas')) add('glas');
+  if (flag(/papier|pappe/i) || fr.has('papier')) add('papier');
+  if (flag(/kleid|textil|schuh/i) || fr.has('altkleider')) add('altkleider');
   if (!out.length && fallback) add(fallback);
   return out;
 }
@@ -372,7 +387,7 @@ export const CITY_SOURCES = {
       return { features: feats };
     },
     map: (p) => (p._c === 'briefkasten'
-      ? { c: 'briefkasten', t: { amenity: 'post_box', operator: p.name || 'Deutsche Post AG', collection_times: p.times?.trim() || undefined } }
+      ? { c: 'briefkasten', t: { amenity: 'post_box', operator: p.name || undefined, collection_times: p.times?.trim() || undefined } }
       : p._c === 'packstation'
       ? { c: 'packstation', t: { amenity: 'parcel_locker', name: p.description || p.name } }
       : { c: p._c, t: container(p._c, { operator: 'Hansestadt Rostock', description: p.description }) }),
@@ -410,12 +425,12 @@ export const CITY_SOURCES = {
       return { features: feats };
     },
     map: (p) => {
-      const txt = Object.values(p).join(' ');
+      const fr = fractionsOf(p);
       if (p._wc) return { c: 'toilette', t: toilet({ name: p.Name || p.name || p.Bezeichnung || p.BEZEICHNUNG }) };
       const out = [];
-      if (/glas/i.test(txt)) out.push({ c: 'glas', t: container('glas', { operator: 'EBE Essen' }) });
-      if (/papier/i.test(txt)) out.push({ c: 'papier', t: container('papier', { operator: 'EBE Essen' }) });
-      if (/kleid|textil/i.test(txt)) out.push({ c: 'altkleider', t: container('altkleider', { operator: 'EBE Essen' }) });
+      if (fr.has('glas')) out.push({ c: 'glas', t: container('glas', { operator: 'EBE Essen' }) });
+      if (fr.has('papier')) out.push({ c: 'papier', t: container('papier', { operator: 'EBE Essen' }) });
+      if (fr.has('altkleider')) out.push({ c: 'altkleider', t: container('altkleider', { operator: 'EBE Essen' }) });
       return out;
     },
   },

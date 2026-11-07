@@ -87,7 +87,7 @@ const ATM_NETS = [
   { id: 'vr', label: 'Volksbank/Raiffeisen', long: 'Volks- und Raiffeisenbanken (BankCard ServiceNetz)', re: /volksbank|raiffeisen|\bvr[- ]?bank|\bbbbank\b|\bpsd\b/i },
   { id: 'cg', label: 'Cash Group', long: 'Cash Group (Deutsche Bank, Commerzbank, HypoVereinsbank, Postbank)', re: /deutsche bank|commerzbank|hypovereinsbank|\bhvb\b|unicredit|postbank|comdirect/i },
   { id: 'cp', label: 'CashPool', long: 'CashPool (u. a. Sparda, Targobank, Santander)', re: /sparda|targobank|santander|oldenburgische landesbank|\bolb\b|national-bank/i },
-  { id: 'free', label: 'Unabhängige', long: 'Unabhängiger Betreiber – meist mit Gebühr', re: /euronet|cashzone|ic ?cash|cardpoint|your ?cash|travelex/i },
+  { id: 'free', label: 'Unabhängige', long: 'Unabhängiger Betreiber – Gebühr am Automaten prüfen', re: /euronet|cashzone|ic ?cash|cardpoint|your ?cash|travelex/i },
 ];
 const ATM_IDS = new Set(ATM_NETS.map((n) => n.id));
 const atmNet = (it) => { if (it._atm !== undefined) return it._atm; const s = `${it.t.brand || ''} ${it.t.operator || ''} ${it.t.name || ''} ${it.t.network || ''}`; return (it._atm = ATM_NETS.find((n) => n.re.test(s))?.id || ''); };
@@ -104,7 +104,7 @@ const state = {
   watchId: null,
   selected: null,
   mode: 'peek', // peek | full
-  nav: store.get('navApp', null), // google | apple | waze
+  nav: null, // google | apple | waze (wird nach NAV geprüft gesetzt)
   providers: new Set(store.get('prov', []).filter((id) => PROVIDERS.some((p) => p.id === id))), // leer = alle Anbieter
   cards: new Set(store.get('cards', []).filter((id) => CARDS.some((c) => c.id === id))), // leer = alle Tankstellen
   atm: new Set(store.get('atm', []).filter((id) => ATM_IDS.has(id))), // Geldautomaten-Verbünde, leer = alle
@@ -180,6 +180,7 @@ for (const g of GROUPS) {
 }
 // App-Kurzbefehle (lange auf das App-Symbol drücken): ?k=toilette | briefkasten | runde | zuletzt
 // Die Auswahl bleibt nur auf dem Gerät; „wie zuletzt“ nutzt einfach die gespeicherte Auswahl.
+const RETURNING = store.get('welcomed', false); // vor der Begrüßung gelesen: war schon einmal hier
 const SHORTCUT = (() => { try { return new URLSearchParams(location.search).get('k'); } catch { return null; } })();
 if (SHORTCUT) {
   try { const u = new URL(location.href); u.searchParams.delete('k'); history.replaceState(null, '', u.pathname + u.search + u.hash); } catch { /* */ }
@@ -197,6 +198,7 @@ const NAV = {
   apple: { name: 'Apple Karten', url: (it) => `https://maps.apple.com/?daddr=${it.lat},${it.lon}&dirflg=d` },
   waze: { name: 'Waze', url: (it) => `https://waze.com/ul?ll=${it.lat},${it.lon}&navigate=yes` },
 };
+{ const n = store.get('navApp', null); state.nav = typeof n === 'string' && Object.hasOwn(NAV, n) ? n : null; }
 const routeUrl = (it) => NAV[state.nav || 'google'].url(it);
 
 function nearestPlace(pt, maxM = 12000) {
@@ -1126,6 +1128,14 @@ body.addEventListener('click', (e) => {
   const r = e.target.closest('.row');
   if (r) openDetail(state.items[+r.dataset.i], true);
 });
+// Tastatur: Listenzeilen mit Enter/Leertaste öffnen (Barrierefreiheit)
+body.addEventListener('keydown', (e) => {
+  if (e.key !== 'Enter' && e.key !== ' ') return;
+  const r = e.target.closest?.('.row');
+  if (!r || e.target !== r) return;
+  e.preventDefault();
+  openDetail(state.items[+r.dataset.i], true);
+});
 
 function openDetail(it, fly = false) {
   $('#crosshair').hidden = true;
@@ -1337,7 +1347,9 @@ async function loadReports(force = false) {
   if (!force && Date.now() - (state.repFetched.get(key) || 0) < 5 * 60000) return;
   state.repFetched.set(key, Date.now());
   try {
-    const rows = await R.fetchBox(b.getSouth() - 0.02, b.getWest() - 0.03, b.getNorth() + 0.02, b.getEast() + 0.03);
+    // Datensparsam: Abfrage auf ein grobes Raster (0,1° ≈ 11 × 7 km) gerundet, damit der Ausschnitt nicht den genauen Standort verrät
+    const fl = (x) => Math.floor(x * 10) / 10, ce = (x) => Math.ceil(x * 10) / 10;
+    const rows = await R.fetchBox(fl(b.getSouth() - 0.02), fl(b.getWest() - 0.03), ce(b.getNorth() + 0.02), ce(b.getEast() + 0.03));
     for (const r of rows) {
       if (!state.repRows.has(r.place_id)) state.repRows.set(r.place_id, []);
       const list = state.repRows.get(r.place_id);
@@ -1365,8 +1377,10 @@ async function submit(report, thanks = 'Danke! Deine Meldung ist gespeichert.') 
     if (!state.repRows.has(report.place_id)) state.repRows.set(report.place_id, []);
     state.repRows.get(report.place_id).push(row);
     applyReports();
+    return true;
   } catch (e) {
     toast(e.message);
+    return false;
   }
 }
 
@@ -1416,17 +1430,24 @@ function openAdd() {
   }));
   const end = () => { $('#crosshair').hidden = true; state.selected = null; renderList(); };
   $('#add-cancel').addEventListener('click', end);
-  $('#add-save').addEventListener('click', async () => {
+  $('#add-save').addEventListener('click', async (ev) => {
     if (!cat) { toast('Bitte zuerst auswählen, was dort ist.'); return; }
+    const btn = ev.currentTarget;
+    if (btn.disabled) return; // Doppeltipp: nicht zweimal eintragen
+    btn.disabled = true;
     const c = map.getCenter();
     const id = `new:${(crypto.randomUUID?.() || String(Date.now())).replace(/-/g, '').slice(0, 20)}`;
     $('#crosshair').hidden = true;
     state.selected = null;
-    await submit({ place_id: id, category: cat, kind: 'new', lat: +c.lat.toFixed(6), lon: +c.lng.toFixed(6) }, 'Danke! Der Ort ist eingetragen und wartet auf Bestätigung.');
+    const ok = await submit({ place_id: id, category: cat, kind: 'new', lat: +c.lat.toFixed(6), lon: +c.lng.toFixed(6) }, 'Danke! Der Ort ist eingetragen und wartet auf Bestätigung.');
+    btn.disabled = false;
+    if (!ok) return;
     const g = GROUP_OF[cat];
     state.active.add(cat);
-    if (g) { groupSel(g).add(cat); store.set(g.key, [...groupSel(g)]); }
-    store.set('cats', [...state.active]);
+    if (!(state.wohin || state.wohinPick)) { // „Wohin damit?“-Auswahl ist nur vorübergehend und wird nicht gespeichert
+      if (g) { groupSel(g).add(cat); store.set(g.key, [...groupSel(g)]); }
+      store.set('cats', [...state.active]);
+    }
     renderChips(); renderProviders(); applyFilter();
   });
   layoutSheet();
@@ -1491,7 +1512,7 @@ $('#support-later').addEventListener('click', () => { $('#support').hidden = tru
 $('#support-never').addEventListener('click', () => { store.set('supportHidden', true); $('#support').hidden = true; });
 if (new URLSearchParams(location.search).has('unterstuetzen')) maybeShowSupport(true);
 // Alte, nicht mehr verwendete Einträge früherer Versionen entfernen
-try { ['firstSeen', 'useDays', 'support'].forEach((k) => localStorage.removeItem(k)); } catch { /* egal */ }
+try { ['firstSeen', 'useDays', 'support', 'starts'].forEach((k) => localStorage.removeItem(k)); } catch { /* egal */ }
 
 // ---------- Wünsche & Rückmeldungen ----------
 // Kein Pop-up: Das Fenster öffnet sich nur, wenn jemand selbst auf „Fehlt was?“ (Ende der Kategorie-Leiste oder Ende der Liste) tippt.
@@ -1730,9 +1751,8 @@ map.on('zoomstart', lpCancel);
 map.on('contextmenu', (e) => { e.originalEvent.preventDefault?.(); openGap(e.lngLat.lat, e.lngLat.lng); });
 // Einmaliger Tipp ab dem dritten Start
 try {
-  const starts = (store.get('starts', 0) || 0) + 1;
-  store.set('starts', starts);
-  if (MITMACHEN && starts >= 3 && !store.get('gapTip', false) && R.enabled()) setTimeout(() => { if ($('#gap').hidden) { toast('Tipp: Lange auf die Karte drücken, wenn an einer Stelle etwas fehlt.'); store.set('gapTip', true); } }, 5000);
+  // Tipp nur für wiederkehrende Nutzer (Begrüßung schon gesehen) – ohne Startzähler, kein Nutzungsprofil
+  if (MITMACHEN && RETURNING && !store.get('gapTip', false) && R.enabled()) setTimeout(() => { if ($('#gap').hidden) { toast('Tipp: Lange auf die Karte drücken, wenn an einer Stelle etwas fehlt.'); store.set('gapTip', true); } }, 5000);
 } catch { /* egal */ }
 
 function openWish() {

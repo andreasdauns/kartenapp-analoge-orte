@@ -9,7 +9,7 @@ import duckdb
 
 DENY = {"alltheplaces"}  # Lizenzlage umstritten (gescrapte Filialfinder)
 BBOX = (5.86, 47.27, 15.05, 55.06)  # Deutschland
-PARCEL_RE = r"(?i)(paket ?-?shop|packstation|poststation|postfiliale|deutsche post|dhl|hermes|\bdpd\b|pickup|\bgls\b|\bups\b|access point|amazon (hub|locker|counter)|myflexbox|deinfach|paketbox|paketstation)"
+PARCEL_RE = r"(?i)(paket ?-?shop|packstation|poststation|postfiliale|deutsche post|\bdhl\b|hermes[ -]?(paket|shop)|\bdpd\b|\bpickup[ -]?(paket ?)?shop|\bgls\b|\bups\b|access point|amazon (hub|locker|counter)|myflexbox|deinfach|paketbox|paketstation)"
 
 meta = {"release": None, "columns": [], "error": None, "by_category": {}, "by_source": {}, "kept": {}}
 

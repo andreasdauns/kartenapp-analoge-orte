@@ -64,7 +64,7 @@ if (nearDup) warn(`${nearDup} mögliche Doppel-Orte (gleiche Kategorie und gleic
 // 6) Vergleich mit der aktuell veröffentlichten Version (großer Einbruch = Fehler, nicht veröffentlichen)
 let prev = null;
 if (prevUrl) {
-  try { prev = await (await fetch(prevUrl)).json(); } catch { warn('Vorversion nicht abrufbar – Vergleich übersprungen'); }
+  try { prev = await (await fetch(prevUrl, { signal: AbortSignal.timeout(60000) })).json(); } catch { warn('Vorversion nicht abrufbar – Vergleich übersprungen'); }
 }
 // Gewollter Rückgang (z. B. nach Entfernen von Doppelten): Commit-Nachricht enthält „[Rückgang ok]“ → nur Hinweis
 const dropMsg = process.env.ALLOW_DROP === 'true' ? warn : err;
@@ -74,6 +74,13 @@ if (prev?.counts) {
   for (const [c, n] of Object.entries(prev.counts)) {
     const now = counts[c] || 0;
     if (n >= 200 && now < n * 0.7) dropMsg(`${c}: ${n} → ${now} (minus ${Math.round((1 - now / n) * 100)} %)`);
+  }
+}
+// Einzelne Quellen, die still ausfallen (z. B. Stadt ändert ihr Format): nur Hinweis, nicht blockieren
+if (prev?.sources && index.sources) {
+  for (const [k, v] of Object.entries(prev.sources)) {
+    const before = v?.count || 0, now = index.sources[k]?.count || 0;
+    if (before >= 10 && now < before * 0.5) warn(`Quelle ${k}: ${before} → ${now} Orte – Abruf prüfen`);
   }
 }
 

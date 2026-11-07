@@ -1,3 +1,7 @@
+-- ⚠️ VERALTET – NICHT MEHR AUSFÜHREN (Stand 7.11.2026)
+-- Diese Datei ist nur die allererste Fassung. Sie würde Lese-Rechte für alle wieder öffnen,
+-- die spätere Absicherungen entfernt haben. Neue Datenbank: siehe supabase/README.md (Reihenfolge).
+--
 -- Around the Corner: Datenbank für Nutzer-Meldungen
 -- Einmal komplett in Supabase unter "SQL Editor" einfügen und auf "Run" klicken.
 

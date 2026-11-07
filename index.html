@@ -24,6 +24,7 @@
   <link rel="stylesheet" href="styles.css">
   <script>/* Android-App (Play Store): Unterstützungs-Links ausblenden (Google-Play-Zahlungsrichtlinie). Merkmal nur für diese Sitzung. */try{var q=new URLSearchParams(location.search);if(q.get('src')==='twa'||document.referrer.indexOf('android-app://')===0)sessionStorage.setItem('twa','1');if(sessionStorage.getItem('twa')==='1')document.documentElement.classList.add('twa')}catch(e){}</script>
   <style>.twa .kofi-only{display:none!important}</style>
+  <script>/* Links auf info.html in der Android-App mit ?src=twa öffnen, damit dort Ko-fi ebenfalls ausgeblendet bleibt (neuer Tab hat eigene Sitzung) */document.addEventListener('click',function(e){try{if(sessionStorage.getItem('twa')!=='1')return;var a=e.target.closest&&e.target.closest('a[href]');if(!a||!/^(\.\/)?info\.html/.test(a.getAttribute('href')))return;var u=new URL(a.href);u.searchParams.set('src','twa');a.href=u.href}catch(x){}},true)</script>
 </head>
 <body>
   <div id="map" aria-label="Karte"></div>

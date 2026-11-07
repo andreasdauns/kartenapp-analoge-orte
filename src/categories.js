@@ -94,7 +94,8 @@ export const CATEGORIES = [
   },
 ];
 
-export const CATEGORY_BY_ID = Object.fromEntries(CATEGORIES.map((c) => [c.id, c]));
+// Ohne Prototyp: Werte aus URL/Speicher wie „__proto__“ oder „constructor“ gelten nicht als Kategorie
+export const CATEGORY_BY_ID = Object.assign(Object.create(null), Object.fromEntries(CATEGORIES.map((c) => [c.id, c])));
 
 const yes = (v) => v === 'yes' || v === 'true';
 
@@ -255,7 +256,7 @@ export const CARD_RULES = {
   aral: {
     aral: 1,          // eigene Marke – https://www.aral.de/de/global/fleet_solutions.html
     eni: 1,           // ROUTEX-Partner (Enilive) – https://www.routex.com
-    total: 1,         // gegenseitige Akzeptanz Aral/TotalEnergies seit 2018 – https://www.auto-medienportal.net/artikel/detail/43235 (Stand nach Übernahme durch Circle K offen)
+    // TotalEnergies: gegenseitige Akzeptanz seit 2018 belegt, Stand nach Übernahme durch Circle K offen → bewusst „unbekannt“ (KI-Prüfer 7.11.2026)
     avia: 1,          // VerkehrsRundschau 3/2024: Aral-Karten an AVIA seit Q3 2024 – https://www.verkehrsrundschau.de/nachrichten/transport-logistik/avia-und-aral-kooperieren-bei-tankkarten-3497808
   },
   shell: {
@@ -269,7 +270,7 @@ export const CARD_RULES = {
   },
   esso: {
     esso: 1,          // eigene Marke – https://www.essocard.com/de-de/ (abgerufen 11/2026)
-    shell: 1,         // essocard.com: Esso-Karten werden an Shell-Stationen angenommen
+    // Shell: ohne genaue Quellseite → bewusst „unbekannt“, bis ein Beleg mit URL vorliegt (KI-Prüfer 7.11.2026)
   },
 };
 

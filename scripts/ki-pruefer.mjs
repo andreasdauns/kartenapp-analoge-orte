@@ -137,4 +137,5 @@ const PRICE = { 'claude-sonnet-5-5': [2, 10], 'claude-opus-5-5': [4, 20], 'claud
 const cost = (tokensIn * PRICE[0] + tokensOut * PRICE[1]) / 1e6;
 const head = `## ${ICON[worst]} KI-Prüfer (${MODE === 'full' ? 'Komplettprüfung' : 'Änderung'}): ${worst}\n\n${MODEL} · ${tokensIn} Eingabe-/${tokensOut} Ausgabe-Tokens · ca. ${cost.toFixed(2)} $`;
 summary(`${head}\n\n${parts.join('\n\n')}`);
-if (worst === 'KRITISCH') await reportIssue(`KI-Prüfer: kritischer Fund (${MODE === 'full' ? 'Komplettprüfung' : (process.env.AFTER || 'HEAD').slice(0, 7)})`, `${parts.join('\n\n')}\n\n—\nLauf: ${runUrl}`);
+// Öffentliches Repo: im Issue keine Details zu möglichen Lücken, nur der Hinweis und der Link zum Lauf
+if (worst === 'KRITISCH') await reportIssue(`KI-Prüfer: kritischer Fund (${MODE === 'full' ? 'Komplettprüfung' : (process.env.AFTER || 'HEAD').slice(0, 7)})`, `Der KI-Prüfer hat einen kritischen Punkt gemeldet. Details stehen in der Zusammenfassung des Laufs; Claude prüft und behebt ihn.\n\nLauf: ${runUrl}`);
